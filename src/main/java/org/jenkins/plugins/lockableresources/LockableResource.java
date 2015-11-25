@@ -60,7 +60,7 @@ public class LockableResource
 	private String reservedBy;
 	private String properties;
 
-	private transient int queueItemId = NOT_QUEUED;
+	private transient long queueItemId = NOT_QUEUED;
 	private transient String queueItemProject = null;
 	private transient AbstractBuild<?, ?> build = null;
 	private transient long queuingStarted = 0;
@@ -184,7 +184,7 @@ public class LockableResource
 		return isQueued() && queueItemId != taskId;
 	}
 
-	public boolean isQueuedByTask(int taskId) {
+	public boolean isQueuedByTask(long taskId) {
 		return getQueueItemId() == taskId;
 	}
 
@@ -228,7 +228,7 @@ public class LockableResource
 		}
 	}
 
-	public int getQueueItemId() {
+	public long getQueueItemId() {
 		this.validateQueuingTimeout();
 		return queueItemId;
 	}
@@ -238,7 +238,7 @@ public class LockableResource
 		return this.queueItemProject;
 	}
 
-	public void setQueued(int queueItemId, String queueProjectName) {
+	public void setQueued(long queueItemId, String queueProjectName) {
 		this.queueItemId = queueItemId;
 		this.queuingStarted = System.currentTimeMillis();
 		this.queueItemProject = queueProjectName;

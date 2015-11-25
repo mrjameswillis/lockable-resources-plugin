@@ -9,6 +9,7 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package org.jenkins.plugins.lockableresources.queue;
 
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.matrix.MatrixProject;
 import hudson.model.AbstractProject;
@@ -18,13 +19,19 @@ import hudson.model.Queue;
 import hudson.model.queue.QueueTaskDispatcher;
 import hudson.model.queue.CauseOfBlockage;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.jenkins.plugins.lockableresources.LockableResource;
 import org.jenkins.plugins.lockableresources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.RequiredResourcesParameterValue;
+import org.jenkins.plugins.lockableresources.RequiredResourcesProperty;
 
 @Extension
 public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
@@ -44,32 +51,30 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 			if (project == null)
 				return null;
 
-			LockableResourcesStruct resources = null;
+			ArrayList<LockableResourcesStruct> resources = new ArrayList<>();
 			for ( ParametersAction pa : item.getActions(ParametersAction.class) ) {
 				for ( ParameterValue pv : pa.getParameters() ) {
 					if ( pv instanceof RequiredResourcesParameterValue ) {
-						resources = new LockableResourcesStruct((RequiredResourcesParameterValue)pv);
-						break;
+						resources.add(new LockableResourcesStruct((RequiredResourcesParameterValue)pv));
 					}
 				}
 			}
-			if ( resources == null ) resources = Utils.requiredResources(project);
-			if ( resources == null || resources.required == null ) {
+			LockableResourcesStruct s = Utils.requiredResources(project);
+			if (s != null)
+				resources.add(s);
+			if ( resources.isEmpty() || resources.stream().anyMatch(lockableResourcesStruct -> lockableResourcesStruct.required == null)) {
 				return null;
-			}
-
-			int resourceNumber;
-			try {
-				resourceNumber = Integer.parseInt(resources.requiredNumber);
-			} catch (NumberFormatException e) {
-				resourceNumber = 0;
 			}
 
 			LOGGER.log(Level.FINEST, "{0} trying to get resources with these details: {1}",
 					new Object[]{project.getFullName(), resources});
 
-			Collection<LockableResource> selected = LockableResourcesManager.get().queue(
-					resources, item, project.getFullName(), resourceNumber);
+			LockableResourcesManager rm = LockableResourcesManager.get();
+			//resources.add(new LockableResourcesStruct(new RequiredResourcesProperty("sta", "ACQUIRED_STA", "2"), new EnvVars()));
+			Collection<LockableResource> selected = null;
+			if (rm != null) {
+				selected = rm.queue(resources, item, project.getFullName());
+			}
 
 			if (selected != null) {
 				LOGGER.log(Level.FINEST, "{0} reserved resources {1}",
@@ -88,15 +93,15 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 
 	public static class BecauseResourcesLocked extends CauseOfBlockage {
 
-		private final LockableResourcesStruct rscStruct;
+		private final ArrayList<LockableResourcesStruct> rscStruct;
 
-		public BecauseResourcesLocked(LockableResourcesStruct r) {
+		public BecauseResourcesLocked(ArrayList<LockableResourcesStruct> r) {
 			this.rscStruct = r;
 		}
 
 		@Override
 		public String getShortDescription() {
-			return "Waiting for resources: " + rscStruct.requiredNames;
+			return "Waiting for resources: " + rscStruct.stream().map(r -> r.requiredNames).collect(Collectors.joining(", "));
 		}
 	}
 

@@ -39,7 +39,7 @@ public class LockableResourcesStruct {
 	}
 
 	public LockableResourcesStruct( RequiredResourcesParameterValue param ) {
-		this(param.value, null, null, new EnvVars());
+		this(param.value, null, "1", new EnvVars());
 	}
 
 	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, EnvVars env ) {
@@ -72,6 +72,15 @@ public class LockableResourcesStruct {
 		this.requiredNumber = requiredNumber;
 	}
 
+	public int getRequiredNumber() {
+		int resourceNumber;
+		try {
+			resourceNumber = Integer.parseInt(requiredNumber);
+		} catch (NumberFormatException e) {
+			resourceNumber = 0;
+		}
+		return resourceNumber;
+	}
 	public String toString() {
 		return "Required resources: " + this.required +
 			", Variable name: " + this.requiredVar +

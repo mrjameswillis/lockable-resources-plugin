@@ -11,10 +11,7 @@ package org.jenkins.plugins.lockableresources;
 
 import hudson.Extension;
 import hudson.Util;
-import hudson.model.AutoCompletionCandidates;
-import hudson.model.JobProperty;
-import hudson.model.JobPropertyDescriptor;
-import hudson.model.Job;
+import hudson.model.*;
 import hudson.util.FormValidation;
 
 import java.util.ArrayList;
@@ -32,56 +29,49 @@ import org.kohsuke.stapler.StaplerRequest;
 
 public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 
-	private final String resourceNames;
-	private final String resourceNamesVar;
-	private final String resourceNumber;
+	public final List<Resource> resources;
+	public final String resourceNamesVar;
 
 	// maintained to facilitate upgrade from v1.6
 	@Deprecated
 	private final transient String labelName = null;
 
-	public RequiredResourcesProperty(String resourceNames,
-			String resourceNamesVar, String resourceNumber,
-			String labelName) {
-		super();
-		if ( labelName != null && !labelName.trim().isEmpty() ) {
-			this.resourceNames = labelName;
-		}
-		else{
-			this.resourceNames = resourceNames;
-		}
-		this.resourceNamesVar = resourceNamesVar;
-		this.resourceNumber = resourceNumber;
-	}
-
 	@DataBoundConstructor
-	public RequiredResourcesProperty(String resourceNames,
-			String resourceNamesVar, String resourceNumber) {
+	public RequiredResourcesProperty(List<Resource> resources,
+			String resourceNamesVar) {
 		super();
-		this.resourceNames = resourceNames;
 		this.resourceNamesVar = resourceNamesVar;
-		this.resourceNumber = resourceNumber;
-	}
-
-	public Object readResolve() {
-		if ( labelName != null ) {
-			return new RequiredResourcesProperty(
-					this.resourceNames, this.resourceNamesVar,
-					this.resourceNumber, this.labelName);
-		}
-		return this;
+		this.resources = new ArrayList<>();
+		if (resources != null)
+			this.resources.addAll(resources);
 	}
 
 	public String getResourceNames() {
-		return resourceNames;
+		return resources.get(0).resourceNames;
 	}
 
-	public String getResourceNamesVar() {
-		return resourceNamesVar;
-	}
+//	public String getResourceNamesVar() {
+//		return resourceNamesVar;
+//	}
 
-	public String getResourceNumber() {
-		return resourceNumber;
+//	public String getResourceNumber() {
+//		return resources.get(0).resourceNumber;
+//	}
+
+	public static class Resource extends AbstractDescribableImpl<Resource> {
+		public final String resourceNames;
+		public final String resourceNumber;
+
+		@DataBoundConstructor
+		public Resource(String resourceNames, String resourceNumber) {
+			this.resourceNames = resourceNames;
+			this.resourceNumber = resourceNumber;
+		}
+
+		@Extension
+		public static class DescriptorImpl extends Descriptor<Resource> {
+			public String getDisplayName() { return ""; }
+		}
 	}
 
 	@Extension
@@ -92,33 +82,33 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 			return "Required Lockable Resources";
 		}
 
-		@Override
-		public RequiredResourcesProperty newInstance(StaplerRequest req,
-				JSONObject formData) throws FormException {
-
-			if (formData.isNullObject())
-				return null;
-
-			JSONObject json = formData
-					.getJSONObject("required-lockable-resources");
-			if (json.isNullObject())
-				return null;
-
-			String resourceNames = Util.fixEmptyAndTrim(json
-					.getString("resourceNames"));
-
-			String resourceNamesVar = Util.fixEmptyAndTrim(json
-					.getString("resourceNamesVar"));
-
-			String resourceNumber = Util.fixEmptyAndTrim(json
-					.getString("resourceNumber"));
-
-			if (resourceNames == null )
-				return null;
-
-			return new RequiredResourcesProperty(resourceNames,
-					resourceNamesVar, resourceNumber);
-		}
+//		@Override
+//		public RequiredResourcesProperty newInstance(StaplerRequest req,
+//				JSONObject formData) throws FormException {
+//
+//			if (formData.isNullObject())
+//				return null;
+//
+//			JSONObject json = formData
+//					.getJSONObject("required-lockable-resources");
+//			if (json.isNullObject())
+//				return null;
+//
+//			String resourceNames = Util.fixEmptyAndTrim(json
+//					.getString("resourceNames"));
+//
+//			String resourceNamesVar = Util.fixEmptyAndTrim(json
+//					.getString("resourceNamesVar"));
+//
+//			String resourceNumber = Util.fixEmptyAndTrim(json
+//					.getString("resourceNumber"));
+//
+//			if (resourceNames == null )
+//				return null;
+//
+//			return new RequiredResourcesProperty(resourceNames,
+//					resourceNamesVar, resourceNumber);
+//		}
 
 		public FormValidation doCheckResourceNames(@QueryParameter String value) {
 			String names = Util.fixEmptyAndTrim(value);
