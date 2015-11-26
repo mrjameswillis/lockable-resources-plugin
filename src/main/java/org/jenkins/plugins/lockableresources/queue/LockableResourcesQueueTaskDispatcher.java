@@ -9,29 +9,23 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package org.jenkins.plugins.lockableresources.queue;
 
-import hudson.EnvVars;
 import hudson.Extension;
 import hudson.matrix.MatrixProject;
 import hudson.model.AbstractProject;
 import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
 import hudson.model.Queue;
-import hudson.model.queue.QueueTaskDispatcher;
 import hudson.model.queue.CauseOfBlockage;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.function.Predicate;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import hudson.model.queue.QueueTaskDispatcher;
 import org.jenkins.plugins.lockableresources.LockableResource;
 import org.jenkins.plugins.lockableresources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.RequiredResourcesParameterValue;
-import org.jenkins.plugins.lockableresources.RequiredResourcesProperty;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @Extension
 public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
@@ -59,9 +53,7 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 					}
 				}
 			}
-			LockableResourcesStruct s = Utils.requiredResources(project);
-			if (s != null)
-				resources.add(s);
+			resources.addAll(Utils.requiredResources(project));
 			if ( resources.isEmpty() || resources.stream().anyMatch(lockableResourcesStruct -> lockableResourcesStruct.required == null)) {
 				return null;
 			}

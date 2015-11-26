@@ -11,16 +11,11 @@ package org.jenkins.plugins.lockableresources.queue;
 
 import hudson.EnvVars;
 import hudson.Util;
+import org.jenkins.plugins.lockableresources.*;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import org.jenkins.plugins.lockableresources.Constants;
-
-import org.jenkins.plugins.lockableresources.LockableResource;
-import org.jenkins.plugins.lockableresources.LockableResourcesManager;
-import org.jenkins.plugins.lockableresources.RequiredResourcesParameterValue;
-import org.jenkins.plugins.lockableresources.RequiredResourcesProperty;
 
 public class LockableResourcesStruct {
 
@@ -29,19 +24,12 @@ public class LockableResourcesStruct {
 	public final String requiredVar;
 	public final String requiredNumber;
 
-	public LockableResourcesStruct(RequiredResourcesProperty property, EnvVars env) {
-		this(
-				property.getResourceNames(),
-				property.getResourceNamesVar(),
-				property.getResourceNumber(),
-				env
-		);
-	}
-
 	public LockableResourcesStruct( RequiredResourcesParameterValue param ) {
 		this(param.value, null, "1", new EnvVars());
 	}
-
+	public LockableResourcesStruct(RequiredResourcesProperty.Resource resource, String requiredVar, EnvVars env ) {
+		this(resource.resourceNames, requiredVar, resource.resourceNumber, env);
+	}
 	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, EnvVars env ) {
 		Set<LockableResource> required = new LinkedHashSet<LockableResource>();
 		requiredNames = Util.fixEmptyAndTrim(requiredNames);
