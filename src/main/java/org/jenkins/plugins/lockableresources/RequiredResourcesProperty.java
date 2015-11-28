@@ -46,18 +46,6 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 			this.resources.addAll(resources);
 	}
 
-	public String getResourceNames() {
-		return resources.get(0).resourceNames;
-	}
-
-//	public String getResourceNamesVar() {
-//		return resourceNamesVar;
-//	}
-
-//	public String getResourceNumber() {
-//		return resources.get(0).resourceNumber;
-//	}
-
 	public static class Resource extends AbstractDescribableImpl<Resource> {
 		public final String resourceNames;
 		public final String resourceNumber;

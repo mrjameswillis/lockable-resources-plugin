@@ -60,14 +60,16 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 						new Object[]{build.getFullDisplayName(), required});
 
 				// add environment variable
-				LockableResourcesStruct resources = Utils.requiredResources(proj);
-				if (resources != null && resources.requiredVar != null) {
-					List<ParameterValue> params = new ArrayList<ParameterValue>();
-					params.add(new StringParameterValue(
-					           resources.requiredVar,
-					           required.toString().replaceAll("[\\]\\[]", ""))
-					);
-					build.addAction(new ParametersAction(params));
+				List<LockableResourcesStruct> resourcesList = Utils.requiredResources(proj);
+				for (LockableResourcesStruct resources : resourcesList) {
+					if (resources.requiredVar != null) {
+						List<ParameterValue> params = new ArrayList<ParameterValue>();
+						params.add(new StringParameterValue(
+								resources.requiredVar,
+								required.toString().replaceAll("[\\]\\[]", ""))
+						);
+						build.addAction(new ParametersAction(params));
+					}
 				}
 			} else {
 				listener.getLogger().printf("%s failed to lock %s", LOG_PREFIX, required);

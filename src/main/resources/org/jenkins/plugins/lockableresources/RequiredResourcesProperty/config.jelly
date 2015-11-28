@@ -15,6 +15,6 @@
 		<f:repeatableProperty field="resources"/>
 	</f:entry>
 	<f:entry title="${%Reserved resources variable name}" >
-		<f:textbox name="resourceNamesVar" filed="resourceNamesVar"/>
+		<f:textbox name="resourceNamesVar" value="${instance.resourceNamesVar}"/>
 	</f:entry>
 </j:jelly>
