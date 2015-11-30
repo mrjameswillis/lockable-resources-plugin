@@ -70,12 +70,13 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 		Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
 		for (String matched : requiredResourcesAction.matchedResources) {
 			LockableResourcesStruct s = requiredResourcesAction.matchedResourcesMap.get(matched);
-			if (indexes.get(s) == null)
-				indexes.put(s, 1);
-			else
-				indexes.put(s, indexes.get(s) + 1);
 			String prefix = null;
 			if (s != null ) {
+				if (indexes.get(s) != null) {
+					indexes.put(s, indexes.get(s) + 1);
+				} else {
+					indexes.put(s, 1);
+				}
 				if (s.requiredVar != null) {
 					if (env.get(s.requiredVar, null) != null) {
 						env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
