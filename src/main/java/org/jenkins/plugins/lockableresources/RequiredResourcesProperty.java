@@ -22,25 +22,16 @@ import java.util.List;
 
 import static org.jenkins.plugins.lockableresources.Constants.*;
 
-import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.StaplerRequest;
 
 public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 
 	public final List<Resource> resources;
-	public final String resourceNamesVar;
-
-	// maintained to facilitate upgrade from v1.6
-	@Deprecated
-	private final transient String labelName = null;
 
 	@DataBoundConstructor
-	public RequiredResourcesProperty(List<Resource> resources,
-			String resourceNamesVar) {
+	public RequiredResourcesProperty(List<Resource> resources) {
 		super();
-		this.resourceNamesVar = resourceNamesVar;
 		this.resources = new ArrayList<>();
 		if (resources != null)
 			this.resources.addAll(resources);
@@ -49,11 +40,15 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 	public static class Resource extends AbstractDescribableImpl<Resource> {
 		public final String resourceNames;
 		public final String resourceNumber;
+		public final String resourceNamesVar;
+		public final String resourceVarsPrefix;
 
 		@DataBoundConstructor
-		public Resource(String resourceNames, String resourceNumber) {
-			this.resourceNames = resourceNames;
-			this.resourceNumber = resourceNumber;
+		public Resource(String resourceNames, String resourceNumber, String resourceNamesVar, String resourceVarsPrefix) {
+			this.resourceNames = Util.fixEmptyAndTrim(resourceNames);
+			this.resourceNumber = Util.fixEmptyAndTrim(resourceNumber);
+			this.resourceNamesVar = Util.fixEmptyAndTrim(resourceNamesVar);
+			this.resourceVarsPrefix = Util.fixEmptyAndTrim(resourceVarsPrefix);
 		}
 
 		@Extension
@@ -62,6 +57,7 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 		}
 	}
 
+	@SuppressWarnings("unused")
 	@Extension
 	public static class DescriptorImpl extends JobPropertyDescriptor {
 
@@ -70,40 +66,12 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 			return "Required Lockable Resources";
 		}
 
-//		@Override
-//		public RequiredResourcesProperty newInstance(StaplerRequest req,
-//				JSONObject formData) throws FormException {
-//
-//			if (formData.isNullObject())
-//				return null;
-//
-//			JSONObject json = formData
-//					.getJSONObject("required-lockable-resources");
-//			if (json.isNullObject())
-//				return null;
-//
-//			String resourceNames = Util.fixEmptyAndTrim(json
-//					.getString("resourceNames"));
-//
-//			String resourceNamesVar = Util.fixEmptyAndTrim(json
-//					.getString("resourceNamesVar"));
-//
-//			String resourceNumber = Util.fixEmptyAndTrim(json
-//					.getString("resourceNumber"));
-//
-//			if (resourceNames == null )
-//				return null;
-//
-//			return new RequiredResourcesProperty(resourceNames,
-//					resourceNamesVar, resourceNumber);
-//		}
-
 		public FormValidation doCheckResourceNames(@QueryParameter String value) {
 			String names = Util.fixEmptyAndTrim(value);
 			if (names == null) {
 				return FormValidation.ok();
 			} else {
-				List<String> wrongNames = new ArrayList<String>();
+				List<String> wrongNames = new ArrayList<>();
 				for (String name : names.split(RESOURCES_SPLIT_REGEX)) {
 					boolean found = false;
 					for (LockableResource r : LockableResourcesManager.get()
@@ -152,7 +120,6 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 					"Could not parse the given value as integer.");
 			}
 
-			LockableResourcesManager manager = LockableResourcesManager.get();
 
 			int numResources = 0;
 			if (names != null) {
@@ -160,15 +127,15 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 					numResources = Integer.MAX_VALUE;
 				}
 				else {
-					HashSet<String> resources = new HashSet<String>();
+					HashSet<String> resources = new HashSet<>();
 					resources.addAll(Arrays.asList(names.split(RESOURCES_SPLIT_REGEX)));
 					Iterator<String> it = resources.iterator();
-					HashSet<String> labelResources = new HashSet<String>();
+					HashSet<String> labelResources = new HashSet<>();
 					while ( it.hasNext() ) {
 						String resource = it.next();
-						if ( manager.fromName(resource) == null ) {
+						if ( LockableResourcesManager.get().fromName(resource) == null ) {
 							it.remove();
-							for ( LockableResource r : manager.getResourcesWithLabel(resource) ) {
+							for ( LockableResource r : LockableResourcesManager.get().getResourcesWithLabel(resource) ) {
 								labelResources.add(r.getName());
 							}
 						}

@@ -13,26 +13,19 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.matrix.MatrixBuild;
-import hudson.model.TaskListener;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
-import hudson.model.Environment;
+import hudson.model.*;
 import hudson.model.listeners.RunListener;
-import hudson.model.ParametersAction;
-import hudson.model.ParameterValue;
-import hudson.model.Run;
-import hudson.model.StringParameterValue;
+import org.jenkins.plugins.lockableresources.LockableResource;
+import org.jenkins.plugins.lockableresources.LockableResourcesManager;
+import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.jenkins.plugins.lockableresources.LockableResourcesManager;
-import org.jenkins.plugins.lockableresources.LockableResource;
-import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
 
 @Extension
 public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
@@ -59,18 +52,6 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 				LOGGER.log(Level.FINE, "{0} acquired lock on {1}",
 						new Object[]{build.getFullDisplayName(), required});
 
-				// add environment variable
-				List<LockableResourcesStruct> resourcesList = Utils.requiredResources(proj);
-				for (LockableResourcesStruct resources : resourcesList) {
-					if (resources.requiredVar != null) {
-						List<ParameterValue> params = new ArrayList<ParameterValue>();
-						params.add(new StringParameterValue(
-								resources.requiredVar,
-								required.toString().replaceAll("[\\]\\[]", ""))
-						);
-						build.addAction(new ParametersAction(params));
-					}
-				}
 			} else {
 				listener.getLogger().printf("%s failed to lock %s", LOG_PREFIX, required);
 				listener.getLogger().println();
@@ -81,14 +62,37 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 	}
 
 	@Override
-	public Environment setUpEnvironment(AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException, Run.RunnerAbortedException {
+	public Environment setUpEnvironment(AbstractBuild build, Launcher launcher, BuildListener listener)
+			throws IOException, InterruptedException, Run.RunnerAbortedException {
 		EnvVars env = new EnvVars();
-		AbstractProject<?, ?> proj = Utils.getProject(build);
-		for ( LockableResource r : LockableResourcesManager.get().getResourcesFromBuild(build) ) {
+		// add environment variable
+		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
+		Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
+		for (String matched : requiredResourcesAction.matchedResources) {
+			LockableResourcesStruct s = requiredResourcesAction.matchedResourcesMap.get(matched);
+			if (indexes.get(s) == null)
+				indexes.put(s, 1);
+			else
+				indexes.put(s, indexes.get(s) + 1);
+			String prefix = null;
+			if (s != null ) {
+				if (s.requiredVar != null) {
+					if (env.get(s.requiredVar, null) != null) {
+						env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
+					} else {
+						env.put(s.requiredVar, matched);
+					}
+				}
+				if (s.resourceVarsPrefix != null)
+					prefix = s.resourceVarsPrefix;
+			}
+			LockableResource r = LockableResourcesManager.get().fromName(matched);
 			String envProps = r.getProperties();
 			if ( envProps != null ) {
 				for ( String prop : envProps.split("\\s*[\\r\\n]+\\s*") ) {
-					env.addLine(prop);
+					if (prefix != null && !prop.isEmpty()) {
+						env.addLine(prefix + indexes.get(s).toString() + prop);
+					}
 				}
 			}
 		}
@@ -96,7 +100,7 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 	}
 
 	@Override
-	public void onCompleted(AbstractBuild<?, ?> build, TaskListener listener) {
+	public void onCompleted(AbstractBuild<?, ?> build, @Nonnull TaskListener listener) {
 		// Skip unlocking for multiple configuration projects,
 		// only the child jobs will actually unlock resources.
 		if (build instanceof MatrixBuild)

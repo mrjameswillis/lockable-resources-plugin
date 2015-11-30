@@ -13,17 +13,22 @@ import hudson.model.AbstractBuild;
 import hudson.model.Action;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.jenkins.plugins.lockableresources.Constants.*;
 import org.jenkins.plugins.lockableresources.LockableResource;
 import org.jenkins.plugins.lockableresources.LockableResourcesManager;
+import org.jenkins.plugins.lockableresources.queue.LockableResourcesStruct;
 
 public class LockedResourcesBuildAction implements Action {
 
 	private final List<ResourcePOJO> lockedResources = new ArrayList<ResourcePOJO>();
 
 	public final transient List<String> matchedResources = new ArrayList<String>();
+
+	public final transient Map<String, LockableResourcesStruct> matchedResourcesMap = new HashMap<>();
 
 	public List<ResourcePOJO> getLockedResources() {
 		return lockedResources;

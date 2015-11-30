@@ -15,33 +15,19 @@ import hudson.XmlFile;
 import hudson.model.AbstractBuild;
 import hudson.model.Queue;
 import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
+import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
+import org.jenkins.plugins.lockableresources.queue.LockableResourcesStruct;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.jenkins.plugins.lockableresources.Constants.*;
-import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
-import org.jenkins.plugins.lockableresources.queue.LockableResourcesStruct;
-
-import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
+import static org.jenkins.plugins.lockableresources.Constants.RESOURCES_SPLIT_REGEX;
 
 public class LockableResourcesManager extends Plugin {
 	
@@ -188,11 +174,11 @@ public class LockableResourcesManager extends Plugin {
 			queueItem.addAction(action);
 		}
 
-		Set<LockableResource> overallSelected = new TreeSet<LockableResource>();
+		Set<Map.Entry<LockableResourcesStruct, LockableResource>> overallSelected = new HashSet<>();
 		int overallTotalNumRequired = 0;
 		for (LockableResourcesStruct requiredResources : requiredResourcesList) {
 			// using a TreeSet here to ensure consistant ordering in logging/messaging output
-			Set<LockableResource> selected = new TreeSet<LockableResource>();
+			Set<LockableResource> selected = new HashSet<>();
 
 			// check for any already queue resources
 			checkCurrentResourcesStatus(selected, action.matchedResources, queueItem.getId());
@@ -293,25 +279,31 @@ public class LockableResourcesManager extends Plugin {
 				LOGGER.log(Level.FINE, "Selected resources: {0}", selected);
 			}
 
-			overallSelected.addAll(selected);
+			for (LockableResource e : selected) {
+				overallSelected.add(new AbstractMap.SimpleEntry<LockableResourcesStruct, LockableResource>(requiredResources, e));
+			}
 		}
 		// if did not get wanted amount or did not get all
 		if (overallSelected.size() != overallTotalNumRequired) {
 			LOGGER.log(Level.FINEST, "{0} found {1} resource(s) to queue. Waiting for correct amount: {2}.",
 					new Object[]{queueItemProject, overallSelected.size(), overallTotalNumRequired});
 			// just to be sure, clean up
-			for (LockableResource r : overallSelected) {
-				r.unqueue();
+			for (Map.Entry<LockableResourcesStruct, LockableResource> r : overallSelected) {
+				r.getValue().unqueue();
 			}
 			return null;
 		}
 		LOGGER.log(Level.FINER, "Queuing locks for selected resources: {0}", overallSelected);
 		action.matchedResources.clear();
-		for (LockableResource rsc : overallSelected) {
-			rsc.setQueued(queueItem.getId(), queueItemProject);
-			action.matchedResources.add(rsc.getName());
+		Collection<LockableResource> result = new TreeSet<>();
+		for (Map.Entry<LockableResourcesStruct, LockableResource> rsc : overallSelected) {
+			rsc.getValue().setQueued(queueItem.getId(), queueItemProject);
+			action.matchedResources.add(rsc.getValue().getName());
+			action.matchedResourcesMap.put(rsc.getValue().getName(), rsc.getKey());
+			result.add(rsc.getValue());
 		}
-		return overallSelected;
+
+		return result;
 	}
 
 	private LockableResource selectResourceToUse( List<LockableResource> resources ) {
@@ -445,13 +437,8 @@ public class LockableResourcesManager extends Plugin {
 	}
 
 	public static LockableResourcesManager get() {
-		Jenkins jenkins = Jenkins.getInstance();
-		if (jenkins != null) {
-			return jenkins.getPlugin(LockableResourcesManager.class);
-		} else {
-			LOGGER.fine("Error, Jenkins could not be found, so no plugin!");
-			return null;
-		}
+		Jenkins jenkins = Jenkins.getActiveInstance();
+		return jenkins.getPlugin(LockableResourcesManager.class);
 	}
 
 	@Override

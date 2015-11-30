@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 @Extension
 public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
@@ -54,7 +53,14 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 				}
 			}
 			resources.addAll(Utils.requiredResources(project));
-			if ( resources.isEmpty() || resources.stream().anyMatch(lockableResourcesStruct -> lockableResourcesStruct.required == null)) {
+			boolean isOk = true;
+			for (LockableResourcesStruct r : resources) {
+				if (r.required == null) {
+					isOk = false;
+					break;
+				}
+			}
+			if ( resources.isEmpty() || !isOk ) {
 				return null;
 			}
 
@@ -93,7 +99,16 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 
 		@Override
 		public String getShortDescription() {
-			return "Waiting for resources: " + rscStruct.stream().map(r -> r.requiredNames).collect(Collectors.joining(", "));
+			StringBuilder sb = new StringBuilder("Waiting for resources: ");
+			boolean first = true;
+			for (LockableResourcesStruct r : rscStruct) {
+				if (!first) {
+					sb.append(", ");
+				}
+				first = false;
+				sb.append(r.requiredNames);
+			}
+			return sb.toString();
 		}
 	}
 

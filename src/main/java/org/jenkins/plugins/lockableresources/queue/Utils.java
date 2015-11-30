@@ -37,7 +37,6 @@ public class Utils {
 
 	public static List<LockableResourcesStruct> requiredResources(
 			AbstractProject<?, ?> project) {
-		RequiredResourcesProperty property = null;
 		EnvVars env = new EnvVars();
 
 		if (project instanceof MatrixConfiguration) {
@@ -45,11 +44,11 @@ public class Utils {
 			project = (AbstractProject<?, ?>) project.getParent();
 		}
 
-		property = project.getProperty(RequiredResourcesProperty.class);
+		RequiredResourcesProperty property = project.getProperty(RequiredResourcesProperty.class);
 		if (property != null) {
 			List<LockableResourcesStruct> res = new ArrayList<>();
 			for (RequiredResourcesProperty.Resource r : property.resources) {
-				res.add(new LockableResourcesStruct(r, property.resourceNamesVar, env));
+				res.add(new LockableResourcesStruct(r, env));
 			}
 			return res;
 		}

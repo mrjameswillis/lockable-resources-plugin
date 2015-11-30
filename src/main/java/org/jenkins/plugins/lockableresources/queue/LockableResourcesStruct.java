@@ -22,15 +22,16 @@ public class LockableResourcesStruct {
 	public final Set<LockableResource> required;
 	public final transient String requiredNames;
 	public final String requiredVar;
+	public final String resourceVarsPrefix;
 	public final String requiredNumber;
 
 	public LockableResourcesStruct( RequiredResourcesParameterValue param ) {
-		this(param.value, null, "1", new EnvVars());
+		this(param.value, null, "1", null, new EnvVars());
 	}
-	public LockableResourcesStruct(RequiredResourcesProperty.Resource resource, String requiredVar, EnvVars env ) {
-		this(resource.resourceNames, requiredVar, resource.resourceNumber, env);
+	public LockableResourcesStruct(RequiredResourcesProperty.Resource resource, EnvVars env ) {
+		this(resource.resourceNames, resource.resourceNamesVar, resource.resourceNumber, resource.resourceVarsPrefix, env);
 	}
-	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, EnvVars env ) {
+	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, String varsPrefix, EnvVars env ) {
 		Set<LockableResource> required = new LinkedHashSet<LockableResource>();
 		requiredNames = Util.fixEmptyAndTrim(requiredNames);
 		if ( requiredNames != null ) {
@@ -58,6 +59,7 @@ public class LockableResourcesStruct {
 		requiredNumber = Util.fixEmptyAndTrim(requiredNumber);
 		if ( requiredNumber != null && requiredNumber.equals("0") ) requiredNumber = null;
 		this.requiredNumber = requiredNumber;
+		this.resourceVarsPrefix = varsPrefix;
 	}
 
 	public int getRequiredNumber() {
