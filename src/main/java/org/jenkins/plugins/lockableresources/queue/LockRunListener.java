@@ -64,35 +64,37 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 	@Override
 	public Environment setUpEnvironment(AbstractBuild build, Launcher launcher, BuildListener listener)
 			throws IOException, InterruptedException, Run.RunnerAbortedException {
-		EnvVars env = new EnvVars();
-		// add environment variable
 		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
-		Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
-		for (String matched : requiredResourcesAction.matchedResources) {
-			LockableResourcesStruct s = requiredResourcesAction.matchedResourcesMap.get(matched);
-			String prefix = null;
-			if (s != null ) {
-				if (indexes.get(s) != null) {
-					indexes.put(s, indexes.get(s) + 1);
-				} else {
-					indexes.put(s, 1);
-				}
-				if (s.requiredVar != null) {
-					if (env.get(s.requiredVar, null) != null) {
-						env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
+		EnvVars env = new EnvVars();
+		if (requiredResourcesAction != null) {
+			// add environment variable
+			Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
+			for (String matched : requiredResourcesAction.matchedResources) {
+				LockableResourcesStruct s = requiredResourcesAction.matchedResourcesMap.get(matched);
+				String prefix = null;
+				if (s != null) {
+					if (indexes.get(s) != null) {
+						indexes.put(s, indexes.get(s) + 1);
 					} else {
-						env.put(s.requiredVar, matched);
+						indexes.put(s, 1);
 					}
+					if (s.requiredVar != null) {
+						if (env.get(s.requiredVar, null) != null) {
+							env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
+						} else {
+							env.put(s.requiredVar, matched);
+						}
+					}
+					if (s.resourceVarsPrefix != null)
+						prefix = s.resourceVarsPrefix;
 				}
-				if (s.resourceVarsPrefix != null)
-					prefix = s.resourceVarsPrefix;
-			}
-			LockableResource r = LockableResourcesManager.get().fromName(matched);
-			String envProps = r.getProperties();
-			if ( envProps != null ) {
-				for ( String prop : envProps.split("\\s*[\\r\\n]+\\s*") ) {
-					if (prefix != null && !prop.isEmpty()) {
-						env.addLine(prefix + indexes.get(s).toString() + prop);
+				LockableResource r = LockableResourcesManager.get().fromName(matched);
+				String envProps = r.getProperties();
+				if (envProps != null) {
+					for (String prop : envProps.split("\\s*[\\r\\n]+\\s*")) {
+						if (prefix != null && !prop.isEmpty()) {
+							env.addLine(prefix + indexes.get(s).toString() + prop);
+						}
 					}
 				}
 			}

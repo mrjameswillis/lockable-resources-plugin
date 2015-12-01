@@ -27,11 +27,14 @@ package org.jenkins.plugins.lockableresources;
 
 
 import hudson.model.AbstractBuild;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import hudson.model.FreeStyleBuild;
+import hudson.model.FreeStyleProject;
+import hudson.tasks.Shell;
+import org.apache.commons.io.FileUtils;
+import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
+import org.junit.*;
+import org.jvnet.hudson.test.JenkinsRule;
+
 import static org.junit.Assert.*;
 
 /**
@@ -275,5 +278,29 @@ public class LockableResourceTest {
 		System.out.println("hashCode");
 		int expResult = 0;
 		int result = instance.hashCode();
+	}
+
+	@Rule
+	public JenkinsRule j = new JenkinsRule();
+
+	@Test
+	public void testJobWithoutResources() throws Exception {
+		FreeStyleProject project = j.createFreeStyleProject();
+		project.getBuildersList().add(new Shell("echo hello"));
+		FreeStyleBuild build = project.scheduleBuild2(0).get();
+		System.out.println(build.getDisplayName() + " completed");
+		String s = FileUtils.readFileToString(build.getLogFile());
+		assert(s.contains("+ echo hello"));
+	}
+
+	@Test
+	public void testJobConfigWithoutResources() throws Exception {
+		FreeStyleProject project = j.createFreeStyleProject();
+		project.getBuildersList().add(new Shell("echo hello"));
+		j.submit(j.createWebClient().getPage(project, "configure").getFormByName("config"));
+		FreeStyleBuild build = project.scheduleBuild2(0).get();
+		System.out.println(build.getDisplayName() + " completed");
+		String s = FileUtils.readFileToString(build.getLogFile());
+		assert(s.contains("+ echo hello"));
 	}
 }
