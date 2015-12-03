@@ -36,9 +36,7 @@ public class Utils {
 	}
 
 	public static List<LockableResourcesStruct> requiredResources(
-			AbstractProject<?, ?> project) {
-		EnvVars env = new EnvVars();
-
+			AbstractProject<?, ?> project, EnvVars env) {
 		if (project instanceof MatrixConfiguration) {
 			env.putAll(((MatrixConfiguration) project).getCombination());
 			project = (AbstractProject<?, ?>) project.getParent();

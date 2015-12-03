@@ -9,12 +9,10 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package org.jenkins.plugins.lockableresources.queue;
 
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.matrix.MatrixProject;
-import hudson.model.AbstractProject;
-import hudson.model.ParameterValue;
-import hudson.model.ParametersAction;
-import hudson.model.Queue;
+import hudson.model.*;
 import hudson.model.queue.CauseOfBlockage;
 import hudson.model.queue.QueueTaskDispatcher;
 import org.jenkins.plugins.lockableresources.LockableResource;
@@ -44,15 +42,18 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 			if (project == null)
 				return null;
 
+			EnvVars env = new EnvVars();
 			ArrayList<LockableResourcesStruct> resources = new ArrayList<>();
 			for ( ParametersAction pa : item.getActions(ParametersAction.class) ) {
 				for ( ParameterValue pv : pa.getParameters() ) {
 					if ( pv instanceof RequiredResourcesParameterValue ) {
 						resources.add(new LockableResourcesStruct((RequiredResourcesParameterValue)pv));
+					} else if (pv instanceof StringParameterValue) {
+						env.put(pv.getName(), pv.getValue().toString());
 					}
 				}
 			}
-			resources.addAll(Utils.requiredResources(project));
+			resources.addAll(Utils.requiredResources(project, env));
 			boolean isOk = true;
 			for (LockableResourcesStruct r : resources) {
 				if (r.required == null) {
@@ -80,7 +81,7 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 				return null;
 			} else {
 				LOGGER.log(Level.FINEST, "{0} waiting for resources", project.getFullName());
-				return new BecauseResourcesLocked(resources);
+				return new BecauseResourcesLocked(resources, env);
 			}
 		}
 		catch ( RuntimeException ex ) {
@@ -92,9 +93,16 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 	public static class BecauseResourcesLocked extends CauseOfBlockage {
 
 		private final ArrayList<LockableResourcesStruct> rscStruct;
+		private final EnvVars env;
 
 		public BecauseResourcesLocked(ArrayList<LockableResourcesStruct> r) {
 			this.rscStruct = r;
+			this.env = new EnvVars();
+		}
+
+		public BecauseResourcesLocked(ArrayList<LockableResourcesStruct> r, EnvVars env) {
+			this.rscStruct = r;
+			this.env = env;
 		}
 
 		@Override
@@ -106,7 +114,7 @@ public class LockableResourcesQueueTaskDispatcher extends QueueTaskDispatcher {
 					sb.append(", ");
 				}
 				first = false;
-				sb.append(r.requiredNames);
+				sb.append(env.expand(r.requiredNames));
 			}
 			return sb.toString();
 		}
