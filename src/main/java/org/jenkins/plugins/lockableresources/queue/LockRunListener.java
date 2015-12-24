@@ -1,5 +1,6 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * Copyright (c) 2013, 6WIND S.A. All rights reserved.                 *
+ * Copyright (c) 2013-2015, 6WIND S.A.                                 *
+ *                          SAP SE                                     *
  *                                                                     *
  * This file is part of the Jenkins Lockable Resources Plugin and is   *
  * published under the MIT license.                                    *
@@ -8,23 +9,23 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package org.jenkins.plugins.lockableresources.queue;
 
+import hudson.EnvVars;
 import hudson.Extension;
+import hudson.Launcher;
 import hudson.matrix.MatrixBuild;
-import hudson.model.TaskListener;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
+import hudson.model.*;
 import hudson.model.listeners.RunListener;
-import hudson.model.ParametersAction;
-import hudson.model.ParameterValue;
-import hudson.model.StringParameterValue;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Logger;
-
-import org.jenkins.plugins.lockableresources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.LockableResource;
+import org.jenkins.plugins.lockableresources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Extension
 public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
@@ -41,42 +42,68 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 			return;
 
 		AbstractProject<?, ?> proj = Utils.getProject(build);
-		List<LockableResource> required = new ArrayList<LockableResource>();
-		if (proj != null) {
-			LockableResourcesStruct resources = Utils.requiredResources(proj);
-			if (resources != null) {
-				if (resources.requiredNumber != null || !resources.label.isEmpty()) {
-					required = LockableResourcesManager.get().
-						getResourcesFromProject(proj.getFullName());
-				} else {
-					required = resources.required;
-				}
-				if (LockableResourcesManager.get().lock(required, build)) {
-					build.addAction(LockedResourcesBuildAction
-							.fromResources(required));
-					listener.getLogger().printf("%s acquired lock on %s\n",
-							LOG_PREFIX, required);
-					LOGGER.fine(build.getFullDisplayName()
-							+ " acquired lock on " + required);
-					if (resources.requiredVar != null) {
-						List<ParameterValue> params = new ArrayList<ParameterValue>();
-						params.add(new StringParameterValue(
-							resources.requiredVar,
-							required.toString().replaceAll("[\\]\\[]", "")));
-						build.addAction(new ParametersAction(params));
-					}
-				} else {
-					listener.getLogger().printf("%s failed to lock %s\n",
-							LOG_PREFIX, required);
-					LOGGER.fine(build.getFullDisplayName() + " failed to lock "
-							+ required);
-				}
+		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
+		if ( proj != null && requiredResourcesAction != null && !requiredResourcesAction.matchedResources.isEmpty() ) {
+			List<String> required = requiredResourcesAction.matchedResources;
+			if (LockableResourcesManager.get().lock(required, build)) {
+				requiredResourcesAction.populateLockedResources(build);
+				listener.getLogger().printf("%s acquired lock on %s", LOG_PREFIX, required);
+				listener.getLogger().println();
+				LOGGER.log(Level.FINE, "{0} acquired lock on {1}",
+						new Object[]{build.getFullDisplayName(), required});
+
+			} else {
+				listener.getLogger().printf("%s failed to lock %s", LOG_PREFIX, required);
+				listener.getLogger().println();
+				LOGGER.log(Level.FINE, "{0} failed to lock {1}",
+						new Object[]{build.getFullDisplayName(), required});
 			}
 		}
 	}
 
 	@Override
-	public void onCompleted(AbstractBuild<?, ?> build, TaskListener listener) {
+	public Environment setUpEnvironment(AbstractBuild build, Launcher launcher, BuildListener listener)
+			throws IOException, InterruptedException, Run.RunnerAbortedException {
+		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
+		EnvVars env = new EnvVars();
+		if (requiredResourcesAction != null) {
+			// add environment variable
+			Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
+			for (String matched : requiredResourcesAction.matchedResources) {
+				LockableResourcesStruct s = requiredResourcesAction.matchedResourcesMap.get(matched);
+				String prefix = null;
+				if (s != null) {
+					if (indexes.get(s) != null) {
+						indexes.put(s, indexes.get(s) + 1);
+					} else {
+						indexes.put(s, 1);
+					}
+					if (s.requiredVar != null) {
+						if (env.get(s.requiredVar, null) != null) {
+							env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
+						} else {
+							env.put(s.requiredVar, matched);
+						}
+					}
+					if (s.resourceVarsPrefix != null)
+						prefix = s.resourceVarsPrefix;
+				}
+				LockableResource r = LockableResourcesManager.get().fromName(matched);
+				String envProps = r.getProperties();
+				if (envProps != null) {
+					for (String prop : envProps.split("\\s*[\\r\\n]+\\s*")) {
+						if (prefix != null && !prop.isEmpty()) {
+							env.addLine(prefix + indexes.get(s).toString() + prop);
+						}
+					}
+				}
+			}
+		}
+		return Environment.create(env);
+	}
+
+	@Override
+	public void onCompleted(AbstractBuild<?, ?> build, @Nonnull TaskListener listener) {
 		// Skip unlocking for multiple configuration projects,
 		// only the child jobs will actually unlock resources.
 		if (build instanceof MatrixBuild)
@@ -89,8 +116,8 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 			LockableResourcesManager.get().unlock(required, build);
 			listener.getLogger().printf("%s released lock on %s\n",
 					LOG_PREFIX, required);
-			LOGGER.fine(build.getFullDisplayName() + " released lock on "
-					+ required);
+			LOGGER.log(Level.FINE, "{0} released lock on {1}",
+					new Object[]{build.getFullDisplayName(), required});
 		}
 
 	}
@@ -106,8 +133,8 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 				.getResourcesFromBuild(build);
 		if (required.size() > 0) {
 			LockableResourcesManager.get().unlock(required, build);
-			LOGGER.fine(build.getFullDisplayName() + " released lock on "
-					+ required);
+			LOGGER.log(Level.FINE, "{0} released lock on {1}",
+					new Object[]{build.getFullDisplayName(), required});
 		}
 	}
 

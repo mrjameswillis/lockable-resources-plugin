@@ -16,6 +16,10 @@ import hudson.model.Queue;
 
 import org.jenkins.plugins.lockableresources.RequiredResourcesProperty;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class Utils {
 
 	public static AbstractProject<?, ?> getProject(Queue.Item item) {
@@ -31,20 +35,21 @@ public class Utils {
 		return null;
 	}
 
-	public static LockableResourcesStruct requiredResources(
-			AbstractProject<?, ?> project) {
-		RequiredResourcesProperty property = null;
-		EnvVars env = new EnvVars();
-
+	public static List<LockableResourcesStruct> requiredResources(
+			AbstractProject<?, ?> project, EnvVars env) {
 		if (project instanceof MatrixConfiguration) {
 			env.putAll(((MatrixConfiguration) project).getCombination());
 			project = (AbstractProject<?, ?>) project.getParent();
 		}
 
-		property = project.getProperty(RequiredResourcesProperty.class);
-		if (property != null)
-			return new LockableResourcesStruct(property, env);
-
-		return null;
+		RequiredResourcesProperty property = project.getProperty(RequiredResourcesProperty.class);
+		if (property != null) {
+			List<LockableResourcesStruct> res = new ArrayList<>();
+			for (RequiredResourcesProperty.Resource r : property.resources) {
+				res.add(new LockableResourcesStruct(r, env));
+			}
+			return res;
+		}
+		return Collections.emptyList();
 	}
 }

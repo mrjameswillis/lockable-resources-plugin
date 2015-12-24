@@ -11,7 +11,19 @@
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
 	xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-	<f:entry title="${%Resources}" >
-		<f:repeatableProperty field="resources"/>
+	<f:entry title="${%Resource name}" field="resourceNames" >
+		<f:textbox />
 	</f:entry>
+    <f:entry title="${%Number of resources to request}" field="resourceNumber">
+        <f:textbox />
+    </f:entry>
+	<f:entry title="${%Reserved resource variable name}" >
+		<f:textbox name="resourceNamesVar" value="${instance.resourceNamesVar}"/>
+	</f:entry>
+	<f:entry title="${%Reserved resource variables prefix}" >
+		<f:textbox name="resourceVarsPrefix" value="${instance.resourceVarsPrefix}"/>
+	</f:entry>
+    <f:entry>
+        <f:repeatableDeleteButton />
+    </f:entry>
 </j:jelly>

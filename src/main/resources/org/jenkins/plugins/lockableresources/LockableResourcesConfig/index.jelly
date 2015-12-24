@@ -1,0 +1,70 @@
+<!--
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * Copyright (c) 2013-2015, 6WIND S.A.                                 *
+ *                          SAP SE                                     *
+ *                                                                     *
+ * This file is part of the Jenkins Lockable Resources Plugin and is   *
+ * published under the MIT license.                                    *
+ *                                                                     *
+ * See the "LICENSE.txt" file for more information.                    *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ -->
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<l:layout permission="${app.ADMINISTER}" title="${it.displayName}" norefresh="true">
+		<l:side-panel>
+			<l:tasks>
+				<l:task icon="images/24x24/up.png" href="${rootURL}/manage" title="${%Manage Jenkins}" permission="${app.ADMINISTER}" />
+			</l:tasks>
+		</l:side-panel>
+
+		<l:main-panel>
+			<h1>${%Lockable Resources Manager}</h1>
+
+			<f:form method="post" action="configSubmit">
+				<j:set var="config" value="${it.manager}" />
+				<j:set var="descriptor" value="${it.descriptor}" />
+
+				<f:advanced align="left">
+					<f:entry title="${%Load Balancing Labels}" field="loadBalancingLabels" help="/plugin/lockable-resources/help/loadBalancing.html">
+						<f:textbox value="${config.loadBalancingLabels}" autoCompleteDelimChar=" "/>
+					</f:entry>
+					<f:entry title="${%Use Resources Evenly}" field="useResourcesEvenly" help="/plugin/lockable-resources/help/useResourcesEvenly.html">
+						<f:checkbox default="${config.useResourcesEvenly}"/>
+					</f:entry>
+					<f:entry title="${%Label Aliases}" help="/plugin/lockable-resources/help/labelAliases.html">
+						<f:repeatable name="labelAliases" var="alias" items="${config.labelAliases.entrySet()}" header="${%Label Alias}" minimum="0" add="${%Add Label Alias}">
+							<table width="675px">
+								<f:entry title="${%Alias}" field="key">
+									<f:textbox value="${alias.key}"/>
+								</f:entry>
+								<f:entry title="${%Value}" field="value">
+									<f:textbox value="${alias.value}"/>
+								</f:entry>
+								<f:entry title="">
+									<div align="right"><f:repeatableDeleteButton/></div>
+								</f:entry>
+							</table>
+						</f:repeatable>
+					</f:entry>
+				</f:advanced>
+
+				<f:entry title="${%Lockable Resources}">
+					<f:repeatable name="resources" var="instance" items="${config.resources}" header="${%Resource}" minimum="0" add="${%Add Lockable Resource}">
+						<j:set var="descriptor" value="${instance.descriptor}" />
+						<table width="700px">
+							<st:include it="${config}" page="/org/jenkins/plugins/lockableresources/LockableResource/config.jelly" />
+							<f:entry title="">
+								<div align="right"><f:repeatableDeleteButton/></div>
+							</f:entry>
+						</table>
+					</f:repeatable>
+				</f:entry>
+
+				<f:bottomButtonBar>
+					<f:submit value="${%Save}"/>
+				</f:bottomButtonBar>
+			</f:form>
+		</l:main-panel>
+	</l:layout>
+
+</j:jelly>

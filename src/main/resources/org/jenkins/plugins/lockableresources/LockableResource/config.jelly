@@ -1,6 +1,7 @@
 <!--
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * Copyright (c) 2013, 6WIND S.A. All rights reserved.                 *
+ * Copyright (c) 2013-2015, 6WIND S.A.                                 *
+ *                          SAP SE                                     *
  *                                                                     *
  * This file is part of the Jenkins Lockable Resources Plugin and is   *
  * published under the MIT license.                                    *
@@ -16,10 +17,13 @@
 	<f:entry title="${%Description}" field="description">
 		<f:textbox/>
 	</f:entry>
-	<f:entry title="${%Labels}" field="labels">
-		<f:textbox/>
+	<f:entry title="${%Labels}" field="labels" help="/plugin/lockable-resources/help/labels.html">
+		<f:textbox autoCompleteDelimChar=" "/>
 	</f:entry>
 	<f:entry title="${%Reserved by}" field="reservedBy">
 		<f:textbox/>
+	</f:entry>
+	<f:entry title="${%Properties}" field="properties" help="/plugin/lockable-resources/help/properties.html">
+		<f:expandableTextbox/>
 	</f:entry>
 </j:jelly>
