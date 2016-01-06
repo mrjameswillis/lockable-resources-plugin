@@ -1,0 +1,38 @@
+<div>
+    <p>
+    When a build is scheduled, it will attempt to lock the specified resources. If
+    some (or all) the resources are already locked by another build, the build will
+    be queued until they are released. You can request multiple resources by name using
+    a space separated list (of either resource name or label) or using groovy.
+    It is possible to specify an amount for requested resources below.
+    </p>
+    <p>
+        If resource name starts with <code>groovy:</code> then it is treated as a groovy expression
+        to be evaluated each time a resource is checked to be appropriate for a build. The
+        expression must result into a boolean value. The following variables are available:
+    </p>
+    <dl>
+        <dt>resourceName</dt>
+        <dd>as per resource configuration</dd>
+        <dt>resourceDescription</dt>
+        <dd>as per resource configuration</dd>
+        <dt>resourceLabels</dt>
+        <dd><code>java.util.List&lt;String&gt;</code> of labels as per resource configuration</dd>
+    </dl>
+    <p>
+        For matrix jobs, axis names and axis values are referencable as well. Examples:
+    </p>
+    <ul>
+        <li><code>groovy:resourceLabels.contains("hardcoded")</code></li>
+        <li><code>groovy:resourceLabels.contains(axisName)</code></li>
+        <li><code>groovy:resourceName == axisName</code></li>
+    </ul>
+    <p>
+        Examples:
+    </p>
+    <ul>
+        <li>Resource Name: <code>Test1 Test2</code></li>
+        <li>Labels (cannot exist as a resource name): <code>lab-1 lab-2</code></li>
+        <li>Groovy script: <code>groovy:resourceName == axisName</code></li>
+    </ul>
+</div>

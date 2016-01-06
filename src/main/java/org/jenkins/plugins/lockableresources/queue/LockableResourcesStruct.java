@@ -16,8 +16,12 @@ import org.jenkins.plugins.lockableresources.*;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.logging.Logger;
 
 public class LockableResourcesStruct {
+
+    static final Logger LOGGER = Logger
+            .getLogger(LockableResourcesStruct.class.getName());
 
 	public final Set<LockableResource> required;
 	public final transient String requiredNames;
@@ -36,6 +40,7 @@ public class LockableResourcesStruct {
 		requiredNames = Util.fixEmptyAndTrim(requiredNames);
 		if ( requiredNames != null ) {
 			if ( requiredNames.startsWith(Constants.GROOVY_LABEL_MARKER) ) {
+				LOGGER.finest("Trying to find groovy resource with: " + requiredNames);
 				required.addAll(LockableResourcesManager.get().getResourcesForExpression(requiredNames, env));
 			}
 			else {
@@ -43,9 +48,10 @@ public class LockableResourcesStruct {
 					name = env.expand(name);
 					LockableResource r = LockableResourcesManager.get().fromName(name);
 					if (r != null) {
+                        LOGGER.finest("Found resource with name: " + name);
 						required.add(r);
-					}
-					else {
+					} else {
+                        LOGGER.finest("Found resource with label: " + name);
 						required.addAll(LockableResourcesManager.get().getResourcesWithLabel(name));
 					}
 				}

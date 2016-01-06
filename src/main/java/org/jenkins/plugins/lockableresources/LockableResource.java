@@ -28,12 +28,8 @@ import hudson.model.Queue.Task;
 import hudson.model.User;
 import hudson.tasks.Mailer.UserProperty;
 import hudson.util.FormValidation;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.LinkedHashSet;
-import java.util.Map;
+
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jenkins.model.Jenkins;
@@ -56,7 +52,7 @@ public class LockableResource
 	private final String name;
 	private final String description;
 	@XStreamConverter(value=LabelConverter.class)
-	private final LinkedHashSet<String> labels = new LinkedHashSet<String>();
+	private final LinkedHashSet<String> labels = new LinkedHashSet<>();
 	private String reservedBy;
 	private String properties;
 
@@ -127,8 +123,14 @@ public class LockableResource
 	public boolean expressionMatches(String expression, Map<String,String> params) {
 		Binding binding = new Binding(params);
 		binding.setVariable("resourceName", name);
-		binding.setVariable("resourceDescription", description);
-		binding.setVariable("resourceLabels", labels);
+		binding.setVariable("resourceDescription", ((description == null) ? "" : description));
+        // Seeing below when running with groovy script, using string for now!
+        // java.lang.ClassCastException: java.util.LinkedList cannot be cast to java.lang.String
+        // at hudson.EnvVars.put(EnvVars.java:74)
+        // at groovy.lang.Binding.setVariable(Binding.java:77)
+        //binding.setVariable("resourceLabels", ((labels == null) ? Collections.EMPTY_LIST : new LinkedList<>(labels)));
+        String tmpLabels = getLabels();
+		binding.setVariable("resourceLabels", ((tmpLabels == null) ? "" : tmpLabels));
 		String expressionToEvaluate = expression.replace(Constants.GROOVY_LABEL_MARKER, "");
 		GroovyShell shell = new GroovyShell(binding);
 		try {
