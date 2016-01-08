@@ -31,8 +31,7 @@ import java.util.logging.Logger;
 public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 
 	static final String LOG_PREFIX = "[lockable-resources]";
-	static final Logger LOGGER = Logger.getLogger(LockRunListener.class
-			.getName());
+	static final Logger LOGGER = Logger.getLogger(LockRunListener.class.getName());
 
 	@Override
 	public void onStarted(AbstractBuild<?, ?> build, TaskListener listener) {
@@ -42,6 +41,7 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 			return;
 
 		AbstractProject<?, ?> proj = Utils.getProject(build);
+        // Line below seems to get all the resources
 		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
 		if ( proj != null && requiredResourcesAction != null && !requiredResourcesAction.matchedResources.isEmpty() ) {
 			List<String> required = requiredResourcesAction.matchedResources;
@@ -51,7 +51,6 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 				listener.getLogger().println();
 				LOGGER.log(Level.FINE, "{0} acquired lock on {1}",
 						new Object[]{build.getFullDisplayName(), required});
-
 			} else {
 				listener.getLogger().printf("%s failed to lock %s", LOG_PREFIX, required);
 				listener.getLogger().println();
@@ -65,6 +64,10 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 	@Override
 	public Environment setUpEnvironment(AbstractBuild build, Launcher launcher, BuildListener listener)
 			throws IOException, InterruptedException, Run.RunnerAbortedException {
+        // check for failed build first
+        if (build.getResult() == Result.FAILURE)
+            throw new Run.RunnerAbortedException();
+
 		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
 		EnvVars env = new EnvVars();
 		if (requiredResourcesAction != null) {
