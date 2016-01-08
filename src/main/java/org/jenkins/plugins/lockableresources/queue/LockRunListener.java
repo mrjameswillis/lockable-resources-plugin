@@ -55,8 +55,9 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 			} else {
 				listener.getLogger().printf("%s failed to lock %s", LOG_PREFIX, required);
 				listener.getLogger().println();
-				LOGGER.log(Level.FINE, "{0} failed to lock {1}",
+				LOGGER.log(Level.SEVERE, "{0} failed to lock {1}",
 						new Object[]{build.getFullDisplayName(), required});
+                build.setResult(Result.FAILURE);
 			}
 		}
 	}
