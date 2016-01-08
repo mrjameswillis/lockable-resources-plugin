@@ -63,7 +63,8 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 
 		@Override
 		public String getDisplayName() {
-			return "Required Lockable Resources";
+			// Use this for sorting, it doesn't change the actual name
+			return "Z Required Lockable Resources";
 		}
 
 		public FormValidation doCheckResourceNames(@QueryParameter String value) {

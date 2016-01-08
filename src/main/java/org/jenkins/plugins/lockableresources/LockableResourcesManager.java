@@ -9,6 +9,7 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 package org.jenkins.plugins.lockableresources;
 
+import hudson.EnvVars;
 import hudson.Plugin;
 import hudson.Util;
 import hudson.XmlFile;
@@ -129,6 +130,26 @@ public class LockableResourcesManager extends Plugin {
 			if ( r.isFree() ) free++;
 		}
 		return free;
+	}
+
+	public List<LockableResource> getResourcesWithLabels(String expression, EnvVars env) {
+		String expressionToEvaluate = expression.replace(Constants.EXACT_LABEL_MARKER, "");
+		List<String> labels = new LinkedList<>();
+		for ( String label : expressionToEvaluate.split("\\s+") ) {
+			if (label.startsWith("%") && label.endsWith("%")) {
+				label = "${" + label.substring(1, label.length() - 1) + "}";
+			}
+			if ( labelsCache.containsKey(label) && labelAliases.containsKey(label) ) {
+				LOGGER.log(Level.FINER, "Coverting label alias {0} to real label.", label);
+				label = labelAliases.get(label);
+			}
+			labels.add(env.expand(label));
+		}
+		List<LockableResource> found = new ArrayList<>();
+		for (LockableResource r : this.resources) {
+			if (r.isValidLabelSet(labels)) found.add(r);
+		}
+		return found;
 	}
 
 	public List<LockableResource> getResourcesWithLabel(String label) {

@@ -32,4 +32,9 @@ public class Constants {
 	 * Prefix for groovy expression to evaluate potential resources.
 	 */
 	public static final String GROOVY_LABEL_MARKER = "groovy:";
+
+    /**
+     * Prefix for label expression to evaluate potential resources.
+     */
+    public static final String EXACT_LABEL_MARKER = "label:";
 }

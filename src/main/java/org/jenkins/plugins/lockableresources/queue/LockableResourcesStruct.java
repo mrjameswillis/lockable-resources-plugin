@@ -20,8 +20,7 @@ import java.util.logging.Logger;
 
 public class LockableResourcesStruct {
 
-    static final Logger LOGGER = Logger
-            .getLogger(LockableResourcesStruct.class.getName());
+    static final Logger LOGGER = Logger.getLogger(LockableResourcesStruct.class.getName());
 
 	public final Set<LockableResource> required;
 	public final transient String requiredNames;
@@ -36,15 +35,20 @@ public class LockableResourcesStruct {
 		this(resource.resourceNames, resource.resourceNamesVar, resource.resourceNumber, resource.resourceVarsPrefix, env);
 	}
 	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, String varsPrefix, EnvVars env ) {
-		Set<LockableResource> required = new LinkedHashSet<LockableResource>();
+		Set<LockableResource> required = new LinkedHashSet<>();
 		requiredNames = Util.fixEmptyAndTrim(requiredNames);
 		if ( requiredNames != null ) {
 			if ( requiredNames.startsWith(Constants.GROOVY_LABEL_MARKER) ) {
-				LOGGER.finest("Trying to find groovy resource with: " + requiredNames);
-				required.addAll(LockableResourcesManager.get().getResourcesForExpression(requiredNames, env));
-			}
-			else {
+                LOGGER.finest("Trying to find groovy resource with: " + requiredNames);
+                required.addAll(LockableResourcesManager.get().getResourcesForExpression(requiredNames, env));
+            } else if ( requiredNames.startsWith(Constants.EXACT_LABEL_MARKER) ) {
+                LOGGER.finest("Trying to find exact label resource with: " + requiredNames);
+                required.addAll(LockableResourcesManager.get().getResourcesWithLabels(requiredNames, env));
+			} else {
 				for ( String name : requiredNames.split("\\s+") ) {
+                    if (name.startsWith("%") && name.endsWith("%")){
+                        name = "${" + name.substring(1, name.length() - 1) + "}";
+                    }
 					name = env.expand(name);
 					LockableResource r = LockableResourcesManager.get().fromName(name);
 					if (r != null) {

@@ -11,7 +11,7 @@
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
 	xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-	<f:section title="${%Lockable Resources}">
+	<f:section title="${%Lockable Resources}" name="required-lockable-resources">
 		<f:entry>
 			<f:repeatableProperty field="resources"/>
 		</f:entry>

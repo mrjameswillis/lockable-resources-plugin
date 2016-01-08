@@ -32,6 +32,9 @@ import hudson.util.FormValidation;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import jenkins.model.Jenkins;
 import static org.jenkins.plugins.lockableresources.Constants.*;
 
@@ -114,11 +117,20 @@ public class LockableResource
 	}
 
 	public boolean isValidLabel(String candidate) {
-		if ( candidate.startsWith(Constants.GROOVY_LABEL_MARKER) ) {
-			throw new UnsupportedOperationException("Groovy expressions not supported by this method.");
-		}
+		if (candidate.startsWith(Constants.GROOVY_LABEL_MARKER) || candidate.startsWith(Constants.EXACT_LABEL_MARKER))
+			throw new UnsupportedOperationException("Groovy or Label expressions not supported by this method.");
 		return labels.contains(candidate);
 	}
+
+    public boolean isValidLabelSet(Collection<String> candidates) {
+        for (String candidate : candidates) {
+            if (candidate.startsWith(Constants.GROOVY_LABEL_MARKER) || candidate.startsWith(Constants.EXACT_LABEL_MARKER))
+                throw new UnsupportedOperationException("Groovy or Label expressions not supported by this method.");
+            else if (!labels.contains(candidate))
+                return false;
+        }
+        return true;
+    }
 
 	public boolean expressionMatches(String expression, Map<String,String> params) {
 		Binding binding = new Binding(params);
@@ -132,6 +144,11 @@ public class LockableResource
         String tmpLabels = getLabels();
 		binding.setVariable("resourceLabels", ((tmpLabels == null) ? "" : tmpLabels));
 		String expressionToEvaluate = expression.replace(Constants.GROOVY_LABEL_MARKER, "");
+        Pattern p = Pattern.compile("%(.*?)%");
+        Matcher m = p.matcher(expression);
+        while (m.find()) {
+            expressionToEvaluate = expressionToEvaluate.replace("%" + m.group(1) + "%", "${" + m.group(1) + "}");
+        }
 		GroovyShell shell = new GroovyShell(binding);
 		try {
 			Object result = shell.evaluate(expressionToEvaluate);
