@@ -19,6 +19,7 @@ import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
 import org.jenkins.plugins.lockableresources.queue.LockableResourcesStruct;
+import org.jenkins.plugins.lockableresources.queue.Utils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
@@ -28,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import static org.jenkins.plugins.lockableresources.Constants.RESOURCES_SPLIT_REGEX;
 
@@ -38,6 +40,7 @@ public class LockableResourcesManager extends Plugin {
 
 	private final LinkedHashSet<String> loadBalancingLabels;
 	private boolean useResourcesEvenly = false;
+    private boolean usePercentMatchingDefault = Constants.DEFAULT_USE_PERCENT_MATCHING;
 	private final LinkedHashSet<LockableResource> resources;
 	private final LinkedHashMap<String,String> labelAliases;
 
@@ -70,8 +73,7 @@ public class LockableResourcesManager extends Plugin {
 				sb.append(" ").append(l);
 			}
 			return sb.substring(1);
-		}
-		else {
+		} else {
 			return null;
 		}
 	}
@@ -79,6 +81,9 @@ public class LockableResourcesManager extends Plugin {
 	public boolean getUseResourcesEvenly() {
 		return useResourcesEvenly;
 	}
+    public boolean getUsePercentMatchingDefault() {
+        return usePercentMatchingDefault;
+    }
 
 	public List<LockableResource> getResourcesFromProject(String fullName) {
 		List<LockableResource> matching = new ArrayList<>();
@@ -134,27 +139,22 @@ public class LockableResourcesManager extends Plugin {
 
 	public List<LockableResource> getResourcesWithLabels(String expression, EnvVars env) {
 		String expressionToEvaluate = expression.replace(Constants.EXACT_LABEL_MARKER, "");
+		Set<String> requiredNamesList = Utils.getExpandedListOfVariables(new LinkedHashSet<>(Arrays.asList(expressionToEvaluate.split("\\s+"))), env);
 		List<String> labels = new LinkedList<>();
-		for ( String label : expressionToEvaluate.split("\\s+") ) {
-			if (label.startsWith("%") && label.endsWith("%")) {
-				label = "${" + label.substring(1, label.length() - 1) + "}";
-			}
+		for ( String label : requiredNamesList ) {
 			if ( labelsCache.containsKey(label) && labelAliases.containsKey(label) ) {
-				LOGGER.log(Level.FINER, "Coverting label alias {0} to real label.", label);
+				LOGGER.log(Level.FINER, "Converting label alias {0} to real label.", label);
 				label = labelAliases.get(label);
 			}
-			labels.add(env.expand(label));
+			labels.add(label);
 		}
-		List<LockableResource> found = new ArrayList<>();
-		for (LockableResource r : this.resources) {
-			if (r.isValidLabelSet(labels)) found.add(r);
-		}
-		return found;
+        LOGGER.log(Level.FINER, "Exact label matching looking for labels {0}", labels);
+		return this.resources.stream().filter(r -> r.isValidLabelSet(labels)).collect(Collectors.toList());
 	}
 
 	public List<LockableResource> getResourcesWithLabel(String label) {
 		if ( labelsCache.containsKey(label) && labelAliases.containsKey(label) ) {
-			LOGGER.log(Level.FINER, "Coverting label alias {0} to real label.", label);
+			LOGGER.log(Level.FINER, "Converting label alias {0} to real label.", label);
 			label = labelAliases.get(label);
 		}
 		List<LockableResource> found = new ArrayList<>();
@@ -168,11 +168,7 @@ public class LockableResourcesManager extends Plugin {
 	 * Evaluates a groovy expression to find matching resources.
 	 */
 	public List<LockableResource> getResourcesForExpression(String expr, Map<String,String> params) {
-		List<LockableResource> found = new ArrayList<>();
-		for (LockableResource r : this.resources) {
-			if (r.expressionMatches(expr, params)) found.add(r);
-		}
-		return found;
+		return this.resources.stream().filter(r -> r.expressionMatches(expr, params)).collect(Collectors.toList());
 	}
 
 	public LockableResource fromName(String resourceName) {
@@ -191,30 +187,28 @@ public class LockableResourcesManager extends Plugin {
 		}
 
 		// the almighty overall selected, all resources sent back will be in here
-		final ConcurrentMap<LockableResourcesStruct, LockableResource> overallSelected = new ConcurrentHashMap<>();
+		final ConcurrentMap<LockableResource, LockableResourcesStruct> overallSelected = new ConcurrentHashMap<>();
 		int overallTotalNumRequired = 0;
 
 		// check for any already queued resources that we can remove
 		Set<LockableResource> selected = new HashSet<>();
 		checkCurrentResourcesStatus(selected, action.matchedResources, queueItem.getId());
-		LOGGER.log(Level.FINEST, "Initial Selected Removed From Queue: {0}", selected);
-		for (LockableResource r : selected) {
-			r.unqueue();
-		}
+		LOGGER.log(Level.FINEST, "Initial selected removed from queue: {0}", selected);
+		selected.forEach(LockableResource::unqueue);
 
 		// now loop through the required resources and create our map
 		for (LockableResourcesStruct requiredResources : requiredResourcesList) {
-			ConcurrentMap<String, LockableResource> tmpSelected = new ConcurrentHashMap<>();
-			ArrayList<LockableResource> candidates = new ArrayList<>(requiredResources.required);
-			LOGGER.log(Level.FINEST, "Initial Candidates: {0}", candidates);
+			List<LockableResource> tmpSelectedQueue = Collections.synchronizedList(new ArrayList<>());
+			List<LockableResource> candidates = Collections.synchronizedList(new ArrayList<>(requiredResources.required));
+			LOGGER.log(Level.FINEST, "Initial candidates: {0}", candidates);
 
 			int numRequired = requiredResources.getRequiredNumber() <= 0 ? candidates.size() : requiredResources.getRequiredNumber();
 			overallTotalNumRequired += numRequired;
 
 			if (numRequired <= 0) {
-				LOGGER.log(Level.FINE, "Required resources already queued: {0}", tmpSelected);
+				LOGGER.log(Level.FINE, "Required resources already queued: {0}", tmpSelectedQueue);
 			} else {
-				List<LockableResource> availableCandidates = new ArrayList<>();
+				List<LockableResource> availableCandidates = Collections.synchronizedList(new ArrayList<>());
 				for (LockableResource rs : candidates) {
 					if (!rs.isReserved() && !rs.isLocked() && !rs.isQueued())
 						availableCandidates.add(rs);
@@ -222,12 +216,12 @@ public class LockableResourcesManager extends Plugin {
 						LOGGER.log(Level.FINE, "Removing resource: {0} [Reserved={1},Locked={2},Queued={3}]",
 								new Object[]{rs, rs.isReserved(), rs.isLocked(), rs.isQueued()});
 				}
-				LOGGER.log(Level.FINEST, "Available candidates: {0}", availableCandidates);
+				LOGGER.log(Level.FINEST, "Available candidates*: {0}", availableCandidates);
 
 				// only use fancy logic if we don't need to lock all of them
-				if (numRequired < candidates.size()) {
-					LOGGER.log(Level.FINEST, "Selecting {0} resources.", numRequired);
-					if (!loadBalancingLabels.isEmpty()) {
+				if (numRequired < availableCandidates.size()) {
+					LOGGER.log(Level.FINEST, "Selecting {0} resources from {1} available", new Object[]{numRequired, availableCandidates.size()});
+					if (!loadBalancingLabels.isEmpty() && loadBalancingLabels.size() > 1) {
 						LOGGER.log(Level.FINEST, "Load balancing labels: {0}", loadBalancingLabels);
 						// now filter based on the load balancing labels parameter
 						// first break our available candidates into a list for each LB label
@@ -238,20 +232,20 @@ public class LockableResourcesManager extends Plugin {
 								if (r.isValidLabel(label)) {
 									foundLabel = true;
 									if (!groups.containsKey(label))
-										groups.put(label, new ArrayList<LockableResource>());
+										groups.put(label, new ArrayList<>());
 									groups.get(label).add(r);
 									break;
 								}
 							}
 							if (!foundLabel) {
-								if (!groups.containsKey(null)) groups.put(null, new ArrayList<LockableResource>());
+								if (!groups.containsKey(null)) groups.put(null, new ArrayList<>());
 								groups.get(null).add(r);
 							}
 						}
 						LOGGER.log(Level.FINER, "Load Balancing Groups: {0}", groups);
 						// now repeatedly select a candidate resource from the label with the lowest current usage
 						boolean resourcesLeft = true;
-						while (tmpSelected.size() < numRequired && resourcesLeft) {
+						while (tmpSelectedQueue.size() < numRequired && resourcesLeft) {
 							resourcesLeft = false;
 							double lowestUsage = 2;
 							String lowestUsageLabel = null;
@@ -270,35 +264,74 @@ public class LockableResourcesManager extends Plugin {
 								List<LockableResource> group = groups.get(lowestUsageLabel);
 								LockableResource r = selectResourceToUse(group);
 								group.remove(r);
-								tmpSelected.put(r.getName(), r);
+								tmpSelectedQueue.add(r);
 								r.setQueued(queueItem.getId(), queueItemProject);
-								LOGGER.log(Level.FINER, "Queued resource lock on: {0}", r);
+								LOGGER.log(Level.FINER, "Queued lb resource lock on: {0}", r);
 							}
 						}
 					} else {
-						while (tmpSelected.size() < numRequired && availableCandidates.size() > 0) {
-							final LockableResource r = selectResourceToUse(availableCandidates);
-							//availableCandidates.remove(r);  // not used after this
-							tmpSelected.put(r.getName(), r);
-							r.setQueued(queueItem.getId(), queueItemProject);
-							LOGGER.log(Level.FINER, "Queued resource lock on: {0}", r);
+						// create a map of candidates by label match so we can use the most selected and work down
+						TreeMap<Double, List<LockableResource>> availableCandidatesMap = new TreeMap<>(Collections.reverseOrder());
+						if (requiredResources.usePercentMatching) {
+                            LOGGER.log(Level.FINEST, "Using percent matching...");
+							for (LockableResource r : availableCandidates) {
+								int i = getResourcesNumberOfMatchedLabels(r, requiredResources.requiredNames, requiredResources.env);
+								LOGGER.log(Level.FINE, "Resource {0} matched labels: {1} / {2}",
+										new Object[]{r.getName(), i, r.getLabelSet().size()});
+								if (i == 0 || r.getLabelSet().size() == 0 || i > r.getLabelSet().size()) {
+									// there was a matched name or groovy script, lets not use this
+									LOGGER.log(Level.FINEST, "Resource {0} has an incompatibility with label matching, skipping...", r.getName());
+									availableCandidatesMap.clear();
+									availableCandidatesMap.put(0.0, availableCandidates);
+									break;
+								}
+								// alright, we should be good to work through the matches
+								double percentMatch = ((double) i) / ((double) r.getLabelSet().size());
+								if (availableCandidatesMap.containsKey(percentMatch)) {
+									LOGGER.log(Level.FINEST, "Adding resource {0} to list[{1}]", new Object[]{r.getName(), percentMatch});
+									availableCandidatesMap.get(percentMatch).add(r);
+								} else {
+									LOGGER.log(Level.FINEST, "Creating list[{1}] with resource {0}", new Object[]{r.getName(), percentMatch});
+									availableCandidatesMap.put(percentMatch, new ArrayList<>(Collections.singletonList(r)));
+								}
+							}
+						} else {
+                            LOGGER.log(Level.FINEST, "Not using percent matching...");
+							availableCandidatesMap.clear();
+							availableCandidatesMap.put(0.0, availableCandidates);
+						}
+						LOGGER.log(Level.FINEST, "Available candidates map*: {0}", availableCandidatesMap);
+						for (Map.Entry<Double, List<LockableResource>> entry : availableCandidatesMap.entrySet()) {
+							LOGGER.log(Level.FINEST, "Working through map entry[{0}]*: {1}", new Object[]{entry.getValue().size(), entry});
+							while (tmpSelectedQueue.size() < numRequired && entry.getValue().size() > 0) {
+								final LockableResource r = selectResourceToUse(entry.getValue());
+								entry.getValue().remove(r);
+								tmpSelectedQueue.add(r);
+								r.setQueued(queueItem.getId(), queueItemProject);
+								LOGGER.log(Level.FINER, "Queued resource lock on: {0}", r);
+							}
+							// hard check to see if we got everything
+							if (tmpSelectedQueue.size() >= numRequired) {
+								LOGGER.log(Level.FINEST, "Found all needed resources [{0}/{1}]: {2}",
+										new Object[]{tmpSelectedQueue.size(), numRequired, tmpSelectedQueue});
+								break;
+							}
 						}
 					}
 				} else {
 					LOGGER.log(Level.FINER, "Selecting all available specified resources.");
-					for (LockableResource r : availableCandidates)
-						tmpSelected.put(r.getName(), r);
+					tmpSelectedQueue.addAll(availableCandidates.stream().collect(Collectors.toList()));
 				}
 
-				LOGGER.log(Level.FINE, "Selected resources: {0}", tmpSelected);
+				LOGGER.log(Level.FINE, "Selected resources: {0}", tmpSelectedQueue);
 			}
 
-			for (LockableResource r : tmpSelected.values()) {
-				if (overallSelected.containsValue(r)) {
+			for (LockableResource r : tmpSelectedQueue) {
+				if (overallSelected.containsKey(r)) {
 					LOGGER.log(Level.FINE, "Trying to lock the same resource already selected: {0}", r);
 					continue;
 				}
-				overallSelected.put(requiredResources, r);
+				overallSelected.put(r, requiredResources);
 			}
 		}
 		// if did not get wanted amount or did not get all
@@ -306,20 +339,18 @@ public class LockableResourcesManager extends Plugin {
 			LOGGER.log(Level.FINEST, "{0} found {1} resource(s) to queue. Waiting for correct amount: {2}.",
 					new Object[]{queueItemProject, overallSelected.size(), overallTotalNumRequired});
 			// just to be sure, clean up since we wont use it now
-			for (LockableResource r : overallSelected.values()) {
-				r.unqueue();
-			}
+			overallSelected.keySet().forEach(LockableResource::unqueue);
 			return null;
 		}
 		LOGGER.log(Level.FINER, "Queuing locks for selected resources: {0}", overallSelected);
 		action.matchedResources.clear();
-		for (LockableResourcesStruct rsc : overallSelected.keySet()) {
-			LockableResource r = overallSelected.get(rsc);
+		for (LockableResource r : overallSelected.keySet()) {
+			LockableResourcesStruct rsc = overallSelected.get(r);
 			r.setQueued(queueItem.getId(), queueItemProject);
 			action.matchedResources.add(r.getName());
 			action.matchedResourcesMap.put(r.getName(), rsc);
 		}
-		return overallSelected.values();
+		return overallSelected.keySet();
 	}
 
 	private synchronized LockableResource selectResourceToUse(List<LockableResource> resources) {
@@ -327,6 +358,31 @@ public class LockableResourcesManager extends Plugin {
 			return resources.get(rand.nextInt(resources.size()));
 		}
 		return resources.get(0);
+	}
+
+	private int getResourcesNumberOfMatchedLabels(LockableResource resource, String requiredNames, EnvVars env) {
+		requiredNames = Util.fixEmptyAndTrim(requiredNames);
+		if (requiredNames == null) return 0;
+		if (requiredNames.startsWith(Constants.GROOVY_LABEL_MARKER)) {
+			// not supported yet, will have to filter out text
+			return 0;
+		} else if (requiredNames.startsWith(Constants.EXACT_LABEL_MARKER)) {
+			requiredNames = requiredNames.replace(Constants.EXACT_LABEL_MARKER, "");
+		} // else
+		int numMatches = 0;
+		for (String name : requiredNames.split("\\s+")) {
+			if (name.startsWith("%") && name.endsWith("%")){
+				name = "${" + name.substring(1, name.length() - 1) + "}";
+			}
+			if (labelsCache.containsKey(name) && labelAliases.containsKey(name)) {
+				name = labelAliases.get(name);
+			}
+			name = env.expand(name);
+			if (resource.getLabelSet().contains(name)) {
+				numMatches++;
+			}
+		}
+		return numMatches;
 	}
 
 	// Adds already selected (in previous queue round) resources to 'selected'
@@ -362,8 +418,7 @@ public class LockableResourcesManager extends Plugin {
 		return true;
 	}
 
-	public synchronized void unlock(List<LockableResource> resources,
-			AbstractBuild<?, ?> build) {
+	public synchronized void unlock(List<LockableResource> resources, AbstractBuild<?, ?> build) {
 		for (LockableResource r : resources) {
 			if (build == null || build == r.getBuild()) {
 				r.unqueue();
@@ -372,8 +427,7 @@ public class LockableResourcesManager extends Plugin {
 		}
 	}
 
-	public synchronized boolean reserve(List<LockableResource> resources,
-			String userName) {
+	public synchronized boolean reserve(List<LockableResource> resources, String userName) {
 		for (LockableResource r : resources) {
 			if (r.isReserved() || r.isLocked() || r.isQueued()) {
 				return false;
@@ -387,16 +441,12 @@ public class LockableResourcesManager extends Plugin {
 	}
 
 	public synchronized void unreserve(List<LockableResource> resources) {
-		for (LockableResource r : resources) {
-			r.unReserve();
-		}
+		resources.forEach(LockableResource::unReserve);
 		save();
 	}
 
 	public synchronized void reset(List<LockableResource> resources) {
-		for (LockableResource r : resources) {
-			r.reset();
-		}
+		resources.forEach(LockableResource::reset);
 		save();
 	}
 
@@ -406,9 +456,9 @@ public class LockableResourcesManager extends Plugin {
 		loadBalancingLabels.clear();
 		Collections.addAll(loadBalancingLabels, loadBalancingLabelsString.split(RESOURCES_SPLIT_REGEX));
 		useResourcesEvenly = json.getBoolean("useResourcesEvenly");
+        usePercentMatchingDefault = json.getBoolean("usePercentMatchingDefault");
 
-		List<KeyValuePair> aliases = req.bindJSONToList(
-				KeyValuePair.class, json.get("labelAliases"));
+		List<KeyValuePair> aliases = req.bindJSONToList(KeyValuePair.class, json.get("labelAliases"));
 		labelAliases.clear();
 		for ( KeyValuePair p : aliases ) {
 			if ( p.key != null && p.value != null ) {
@@ -416,8 +466,7 @@ public class LockableResourcesManager extends Plugin {
 			}
 		}
 
-		List<LockableResource> newResources = req.bindJSONToList(
-				LockableResource.class, json.get("resources"));
+		List<LockableResource> newResources = req.bindJSONToList(LockableResource.class, json.get("resources"));
 		for (LockableResource r : newResources) {
 			LockableResource old = fromName(r.getName());
 			if (old != null) {

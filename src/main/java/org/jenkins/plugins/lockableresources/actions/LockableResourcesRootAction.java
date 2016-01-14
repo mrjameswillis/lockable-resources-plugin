@@ -102,8 +102,7 @@ public class LockableResourcesRootAction implements RootAction {
 		return LockableResourcesManager.get().getAllLabels().size();
 	}
 
-	public void doUnlock(StaplerRequest req, StaplerResponse rsp)
-			throws IOException, ServletException {
+	public void doUnlock(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
 		Jenkins.getInstance().checkPermission(UNLOCK);
 
 		String name = req.getParameter("resource");
@@ -113,15 +112,14 @@ public class LockableResourcesRootAction implements RootAction {
 			return;
 		}
 
-		List<LockableResource> resources = new ArrayList<LockableResource>();
+		List<LockableResource> resources = new ArrayList<>();
 		resources.add(r);
 		LockableResourcesManager.get().unlock(resources, null);
 
 		rsp.forwardToPreviousPage(req);
 	}
 
-	public void doReserve(StaplerRequest req, StaplerResponse rsp)
-		throws IOException, ServletException {
+	public void doReserve(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
 		Jenkins.getInstance().checkPermission(RESERVE);
 
 		String name = req.getParameter("resource");
@@ -131,7 +129,7 @@ public class LockableResourcesRootAction implements RootAction {
 			return;
 		}
 
-		List<LockableResource> resources = new ArrayList<LockableResource>();
+		List<LockableResource> resources = new ArrayList<>();
 		resources.add(r);
 		String userName = getUserName();
 		if (userName != null)
@@ -140,8 +138,7 @@ public class LockableResourcesRootAction implements RootAction {
 		rsp.forwardToPreviousPage(req);
 	}
 
-	public void doUnreserve(StaplerRequest req, StaplerResponse rsp)
-		throws IOException, ServletException {
+	public void doUnreserve(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
 		Jenkins.getInstance().checkPermission(RESERVE);
 
 		String name = req.getParameter("resource");
@@ -157,15 +154,14 @@ public class LockableResourcesRootAction implements RootAction {
 			throw new AccessDeniedException2(Jenkins.getAuthentication(),
 					RESERVE);
 
-		List<LockableResource> resources = new ArrayList<LockableResource>();
+		List<LockableResource> resources = new ArrayList<>();
 		resources.add(r);
 		LockableResourcesManager.get().unreserve(resources);
 
 		rsp.forwardToPreviousPage(req);
 	}
 
-	public void doReset(StaplerRequest req, StaplerResponse rsp)
-		throws IOException, ServletException {
+	public void doReset(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
 		Jenkins.getInstance().checkPermission(UNLOCK);
 
 		String name = req.getParameter("resource");
@@ -175,7 +171,7 @@ public class LockableResourcesRootAction implements RootAction {
 			return;
 		}
 
-		List<LockableResource> resources = new ArrayList<LockableResource>();
+		List<LockableResource> resources = new ArrayList<>();
 		resources.add(r);
 		LockableResourcesManager.get().reset(resources);
 

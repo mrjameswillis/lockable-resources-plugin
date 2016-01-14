@@ -11,19 +11,24 @@
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
 	xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<f:invisibleEntry>
+		<f:readOnlyTextbox name="uniqueID" value="${instance.uniqueID}"/>
+	</f:invisibleEntry>
 	<f:entry title="${%Name}" field="name">
 		<f:textbox/>
 	</f:entry>
 	<f:entry title="${%Description}" field="description">
 		<f:textbox/>
 	</f:entry>
-	<f:entry title="${%Labels}" field="labels" help="/plugin/lockable-resources/help/labels.html">
+	<f:entry title="${%Labels}" field="labels">
 		<f:textbox autoCompleteDelimChar=" "/>
 	</f:entry>
 	<f:entry title="${%Reserved by}" field="reservedBy">
 		<f:textbox/>
 	</f:entry>
-	<f:entry title="${%Properties}" field="properties" help="/plugin/lockable-resources/help/properties.html">
-		<f:expandableTextbox/>
+	<f:entry title="${%Properties}" field="properties">
+		<f:repeatable field="properties" header="${%Property} (${%Key} | ${%Value})" minimum="0" add="${%Add Property}">
+			<st:include page="config.jelly" class="org.jenkins.plugins.lockableresources.LockableResourceProperty"/>
+		</f:repeatable>
 	</f:entry>
 </j:jelly>

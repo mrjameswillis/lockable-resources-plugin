@@ -14,16 +14,15 @@ import hudson.Util;
 import hudson.model.*;
 import hudson.util.FormValidation;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.jenkins.plugins.lockableresources.Constants.*;
 
+import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
 
 public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 
@@ -32,27 +31,74 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 	@DataBoundConstructor
 	public RequiredResourcesProperty(List<Resource> resources) {
 		super();
-		this.resources = new ArrayList<>();
-		if (resources != null)
-			this.resources.addAll(resources);
+		this.resources = resources == null ? new ArrayList<>() : resources;
+	}
+
+	public List<Resource> getResources() {
+		return resources;
 	}
 
 	public static class Resource extends AbstractDescribableImpl<Resource> {
+		public String uniqueID;
 		public final String resourceNames;
 		public final String resourceNumber;
 		public final String resourceNamesVar;
 		public final String resourceVarsPrefix;
+		public boolean usePercentMatching;
 
-		@DataBoundConstructor
-		public Resource(String resourceNames, String resourceNumber, String resourceNamesVar, String resourceVarsPrefix) {
-			this.resourceNames = Util.fixEmptyAndTrim(resourceNames);
-			this.resourceNumber = Util.fixEmptyAndTrim(resourceNumber);
-			this.resourceNamesVar = Util.fixEmptyAndTrim(resourceNamesVar);
-			this.resourceVarsPrefix = Util.fixEmptyAndTrim(resourceVarsPrefix);
+        @DataBoundConstructor
+        public Resource(String uniqueID, String resourceNames, String resourceNumber, String resourceNamesVar, String resourceVarsPrefix, boolean usePercentMatching) {
+            this.uniqueID = Util.fixEmptyAndTrim(uniqueID);
+            this.resourceNames = Util.fixEmptyAndTrim(resourceNames);
+            this.resourceNumber = Util.fixEmptyAndTrim(resourceNumber);
+            this.resourceNamesVar = Util.fixEmptyAndTrim(resourceNamesVar);
+            this.resourceVarsPrefix = Util.fixEmptyAndTrim(resourceVarsPrefix);
+            this.usePercentMatching = usePercentMatching;
+        }
+
+		public String getUniqueID() {
+			return uniqueID;
 		}
 
+		@Override
+		public boolean equals(Object other) {
+			boolean result = false;
+			if (other instanceof Resource) {
+				Resource that = (Resource) other;
+				result = (that.canEqual(this) && this.uniqueID.equals(that.uniqueID) && super.equals(that));
+			}
+			return result;
+		}
+
+		@Override
+		public int hashCode() {
+			return (41 * super.hashCode() + uniqueID.hashCode());
+		}
+
+		public boolean canEqual(Object other) {
+			return (other instanceof Resource);
+		}
+
+		public static String generateUniqueID() {
+			return UUID.randomUUID().toString();
+		}
+
+		@SuppressWarnings("unused")
 		@Extension
 		public static class DescriptorImpl extends Descriptor<Resource> {
+
+            @Override
+			public Resource newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+				Resource resource = super.newInstance(req, formData);
+				if (resource.uniqueID == null)
+					resource.uniqueID = Resource.generateUniqueID();
+				return resource;
+			}
+
+            public boolean getUsePercentMatchingDefault() {
+                return LockableResourcesManager.get().getUsePercentMatchingDefault();
+            }
+
 			public String getDisplayName() { return ""; }
 		}
 	}
@@ -63,7 +109,6 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 
 		@Override
 		public String getDisplayName() {
-			// Use this for sorting, it doesn't change the actual name
 			return "Z Required Lockable Resources";
 		}
 
@@ -75,8 +120,7 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 				List<String> wrongNames = new ArrayList<>();
 				for (String name : names.split(RESOURCES_SPLIT_REGEX)) {
 					boolean found = false;
-					for (LockableResource r : LockableResourcesManager.get()
-							.getResources()) {
+					for (LockableResource r : LockableResourcesManager.get().getResources()) {
 						if (r.getName().equals(name)) {
 							found = true;
 							break;
@@ -136,9 +180,8 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 						String resource = it.next();
 						if ( LockableResourcesManager.get().fromName(resource) == null ) {
 							it.remove();
-							for ( LockableResource r : LockableResourcesManager.get().getResourcesWithLabel(resource) ) {
-								labelResources.add(r.getName());
-							}
+							labelResources.addAll(LockableResourcesManager.get().getResourcesWithLabel(resource)
+									.stream().map(LockableResource::getName).collect(Collectors.toList()));
 						}
 					}
 					resources.addAll(labelResources);
@@ -155,12 +198,9 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 			return FormValidation.ok();
 		}
 
-		public AutoCompletionCandidates doAutoCompleteResourceNames(
-				@QueryParameter String value) {
+		public AutoCompletionCandidates doAutoCompleteResourceNames(@QueryParameter String value) {
 			AutoCompletionCandidates c = new AutoCompletionCandidates();
-
 			value = Util.fixEmptyAndTrim(value);
-
 			if (value != null) {
 				for (LockableResource r : LockableResourcesManager.get()
 						.getResources()) {
@@ -171,7 +211,6 @@ public class RequiredResourcesProperty extends JobProperty<Job<?, ?>> {
 					if ( l.startsWith(value) ) c.add(l);
 				}
 			}
-
 			return c;
 		}
 	}

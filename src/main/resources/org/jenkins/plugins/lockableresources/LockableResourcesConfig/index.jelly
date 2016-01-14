@@ -25,13 +25,16 @@
 				<j:set var="descriptor" value="${it.descriptor}" />
 
 				<f:advanced align="left">
-					<f:entry title="${%Load Balancing Labels}" field="loadBalancingLabels" help="/plugin/lockable-resources/help/loadBalancing.html">
+					<f:entry title="${%Load Balancing Labels}" field="loadBalancingLabels">
 						<f:textbox value="${config.loadBalancingLabels}" autoCompleteDelimChar=" "/>
 					</f:entry>
-					<f:entry title="${%Use Resources Evenly}" field="useResourcesEvenly" help="/plugin/lockable-resources/help/useResourcesEvenly.html">
+					<f:entry title="${%Use Resources Evenly}" field="useResourcesEvenly">
 						<f:checkbox default="${config.useResourcesEvenly}"/>
 					</f:entry>
-					<f:entry title="${%Label Aliases}" help="/plugin/lockable-resources/help/labelAliases.html">
+					<f:entry title="${%Use Percent Matching Default}" field="usePercentMatchingDefault">
+						<f:checkbox default="${config.usePercentMatchingDefault}"/>
+					</f:entry>
+					<f:entry title="${%Label Aliases}" field="labelAliasesEntry">
 						<f:repeatable name="labelAliases" var="alias" items="${config.labelAliases.entrySet()}" header="${%Label Alias}" minimum="0" add="${%Add Label Alias}">
 							<table width="675px">
 								<f:entry title="${%Alias}" field="key">

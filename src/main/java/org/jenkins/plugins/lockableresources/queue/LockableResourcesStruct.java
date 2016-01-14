@@ -13,9 +13,7 @@ import hudson.EnvVars;
 import hudson.Util;
 import org.jenkins.plugins.lockableresources.*;
 
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class LockableResourcesStruct {
@@ -27,29 +25,29 @@ public class LockableResourcesStruct {
 	public final String requiredVar;
 	public final String resourceVarsPrefix;
 	public final String requiredNumber;
+    public final boolean usePercentMatching;
+    public final EnvVars env;
 
-	public LockableResourcesStruct( RequiredResourcesParameterValue param ) {
-		this(param.value, null, "1", null, new EnvVars());
+	public LockableResourcesStruct(RequiredResourcesParameterValue param) {
+		this(param.value, null, "1", null, false, new EnvVars());
 	}
-	public LockableResourcesStruct(RequiredResourcesProperty.Resource resource, EnvVars env ) {
-		this(resource.resourceNames, resource.resourceNamesVar, resource.resourceNumber, resource.resourceVarsPrefix, env);
+	public LockableResourcesStruct(RequiredResourcesProperty.Resource resource, EnvVars env) {
+		this(resource.resourceNames, resource.resourceNamesVar, resource.resourceNumber, resource.resourceVarsPrefix, resource.usePercentMatching, env);
 	}
-	private LockableResourcesStruct( String requiredNames, String requiredVar, String requiredNumber, String varsPrefix, EnvVars env ) {
+	private LockableResourcesStruct(String requiredNames, String requiredVar, String requiredNumber, String varsPrefix, boolean usePercentMatching, EnvVars env) {
 		Set<LockableResource> required = new LinkedHashSet<>();
 		requiredNames = Util.fixEmptyAndTrim(requiredNames);
+        this.env = env;
 		if ( requiredNames != null ) {
 			if ( requiredNames.startsWith(Constants.GROOVY_LABEL_MARKER) ) {
                 LOGGER.finest("Trying to find groovy resource with: " + requiredNames);
-                required.addAll(LockableResourcesManager.get().getResourcesForExpression(requiredNames, env));
+                required.addAll(LockableResourcesManager.get().getResourcesForExpression(requiredNames, this.env));
             } else if ( requiredNames.startsWith(Constants.EXACT_LABEL_MARKER) ) {
                 LOGGER.finest("Trying to find exact label resource with: " + requiredNames);
-                required.addAll(LockableResourcesManager.get().getResourcesWithLabels(requiredNames, env));
+                required.addAll(LockableResourcesManager.get().getResourcesWithLabels(requiredNames, this.env));
 			} else {
-				for ( String name : requiredNames.split("\\s+") ) {
-                    if (name.startsWith("%") && name.endsWith("%")){
-                        name = "${" + name.substring(1, name.length() - 1) + "}";
-                    }
-					name = env.expand(name);
+                Set<String> requiredNamesList = Utils.getExpandedListOfVariables(new LinkedHashSet<>(Arrays.asList(requiredNames.split("\\s+"))), this.env);
+				for ( String name : requiredNamesList ) {
 					LockableResource r = LockableResourcesManager.get().fromName(name);
 					if (r != null) {
                         LOGGER.finest("Found resource with name: " + name);
@@ -61,15 +59,17 @@ public class LockableResourcesStruct {
 				}
 			}
 		}
+        LOGGER.finest("Found required resources: " + required);
 		this.requiredNames = requiredNames;
 		this.required = Collections.unmodifiableSet(required);
 
-		this.requiredVar = Util.fixEmptyAndTrim(requiredVar);
+		this.requiredVar = Utils.getExpandedVariables(Util.fixEmptyAndTrim(requiredVar), this.env, 1);
 
-		requiredNumber = Util.fixEmptyAndTrim(requiredNumber);
-		if ( requiredNumber != null && requiredNumber.equals("0") ) requiredNumber = null;
+		requiredNumber = Utils.getExpandedVariables(Util.fixEmptyAndTrim(requiredNumber), this.env, 1);
+		if (requiredNumber != null && requiredNumber.equals("0")) requiredNumber = null;
 		this.requiredNumber = requiredNumber;
-		this.resourceVarsPrefix = varsPrefix;
+		this.resourceVarsPrefix = Utils.getExpandedVariables(varsPrefix, this.env, 1);
+        this.usePercentMatching = usePercentMatching;
 	}
 
 	public int getRequiredNumber() {

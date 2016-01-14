@@ -10,15 +10,15 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
-	xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-	<f:section title="${%Required Lockable Resources}">
-		<f:entry>
-			<f:repeatableProperty field="resources" minimum="0" add="${%Add Resource}"/>
-		</f:entry>
-        <!-- below doesn't work yet because RequiredResourceProperty has Resource in it
-        <f:repeatable field="resources" minimum="0" add="Add Resource">
-            <st:include page="config.jelly" class="org.jenkins.plugins.lockableresources.RequiredResourcesProperty.Resource"/>
-        </f:repeatable>
-        -->
-	</f:section>
+		 xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <table width="100%">
+        <col width="47%"/>
+        <col width="47%"/>
+        <col width="6%"/>
+        <tr>
+            <td><f:textbox field="name"/></td>
+            <td><f:textbox field="value"/></td>
+            <td align="center"><f:repeatableDeleteButton value="X"/></td>
+        </tr>
+    </table>
 </j:jelly>

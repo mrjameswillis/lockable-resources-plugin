@@ -16,6 +16,7 @@ import hudson.matrix.MatrixBuild;
 import hudson.model.*;
 import hudson.model.listeners.RunListener;
 import org.jenkins.plugins.lockableresources.LockableResource;
+import org.jenkins.plugins.lockableresources.LockableResourceProperty;
 import org.jenkins.plugins.lockableresources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.actions.LockedResourcesBuildAction;
 
@@ -71,6 +72,7 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 		LockedResourcesBuildAction requiredResourcesAction = build.getAction(LockedResourcesBuildAction.class);
 		EnvVars env = new EnvVars();
 		if (requiredResourcesAction != null) {
+            // TODO: if no resource is found -> error out build
 			// add environment variable
 			Map<LockableResourcesStruct, Integer> indexes = new HashMap<>();
 			for (String matched : requiredResourcesAction.matchedResources) {
@@ -84,23 +86,29 @@ public class LockRunListener extends RunListener<AbstractBuild<?, ?>> {
 					}
 					if (s.requiredVar != null) {
 						if (env.get(s.requiredVar, null) != null) {
+                            // its been added before logic, so append the newly found
 							env.put(s.requiredVar, env.get(s.requiredVar) + " " + matched);
 						} else {
 							env.put(s.requiredVar, matched);
 						}
+                        // add a unique instance of it
+                        env.put(s.requiredVar + indexes.get(s).toString(), matched);
 					}
 					if (s.resourceVarsPrefix != null)
 						prefix = s.resourceVarsPrefix;
+                    // if prefix is still null, use required var
+                    if (prefix == null || prefix.isEmpty())
+                        prefix = s.requiredVar;
 				}
 				LockableResource r = LockableResourcesManager.get().fromName(matched);
-				String envProps = r.getProperties();
-				if (envProps != null) {
-					for (String prop : envProps.split("\\s*[\\r\\n]+\\s*")) {
-						if (prefix != null && !prop.isEmpty()) {
-							env.addLine(prefix + indexes.get(s).toString() + prop);
-						}
-					}
-				}
+                env.putIfNotNull(prefix + indexes.get(s).toString() + "_desc", r.getDescription());
+                env.putIfNotNull(prefix + indexes.get(s).toString() + "_labels", r.getLabels());
+                List<LockableResourceProperty> envProps = r.getProperties();
+                for (LockableResourceProperty prop : envProps) {
+                    LOGGER.log(Level.FINEST, "{0} added environment variable [{1}]",
+                            new Object[]{r.getName(), prop.toString()});
+                    env.put(prefix + indexes.get(s).toString() + "_" + prop.getName(), prop.getValue());
+                }
 			}
 		}
 		return Environment.create(env);

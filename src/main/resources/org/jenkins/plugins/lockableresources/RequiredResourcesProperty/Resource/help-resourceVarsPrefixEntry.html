@@ -1,6 +1,14 @@
 <div>
-<p>
-Prefix for the Jenkins variable to store the reserved resources in. Leave empty
-to disable. Useful if requesting multiple resources.
-</p>
+    <p>
+        Optional: Prefix for the resource properties to store the reserved resources in. Leave empty
+        to disable. If empty, will use the resource name variable with an underscore at the end.
+    </p>
+    <p>
+        Examples:
+    </p>
+    <ul>
+        <li>Empty: <code>RESOURCE1_PROPERTY</code></li>
+        <li>Given "TEST": <code>TEST1_PROPERTY</code></li>
+        <li>Given "ANOTHER_": <code>ANOTHER_1_PROPERTY</code></li>
+    </ul>
 </div>

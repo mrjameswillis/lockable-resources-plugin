@@ -38,8 +38,10 @@ import java.util.regex.Pattern;
 import jenkins.model.Jenkins;
 import static org.jenkins.plugins.lockableresources.Constants.*;
 
+import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
@@ -52,12 +54,13 @@ public class LockableResource
 	public static final int NOT_QUEUED = 0;
 	private static final int QUEUE_TIMEOUT = 60 * 1000;
 
+	public String uniqueID;
 	private final String name;
 	private final String description;
 	@XStreamConverter(value=LabelConverter.class)
 	private final LinkedHashSet<String> labels = new LinkedHashSet<>();
 	private String reservedBy;
-	private String properties;
+	private List<LockableResourceProperty> properties;
 
 	private transient long queueItemId = NOT_QUEUED;
 	private transient String queueItemProject = null;
@@ -65,14 +68,15 @@ public class LockableResource
 	private transient long queuingStarted = 0;
 
 	@DataBoundConstructor
-	public LockableResource(String name, String description, String labels, String reservedBy, String properties) {
+	public LockableResource(String uniqueID, String name, String description, String labels, String reservedBy, List<LockableResourceProperty> properties) {
+        this.uniqueID = Util.fixEmptyAndTrim(uniqueID);
 		this.name = Util.fixEmptyAndTrim(name);
 		if ( this.name == null ) throw new IllegalArgumentException("Resource must have a name!");
 		if ( this.name.contains(" ") ) throw new IllegalArgumentException("Resource names cannot contain spaces!");
 		this.description = Util.fixEmptyAndTrim(description);
 		this.labels.addAll(labelsFromString(Util.fixNull(labels).trim()));
 		this.reservedBy = Util.fixEmptyAndTrim(reservedBy);
-		this.properties = properties;
+        this.properties = properties == null ? new ArrayList<>() : properties;
 	}
 
 	@Exported
@@ -98,6 +102,10 @@ public class LockableResource
 			return null;
 		}
 	}
+
+    public static String generateUniqueID() {
+        return UUID.randomUUID().toString();
+    }
 	
 	/**
 	 * FOR INTERNAL USE ONLY!
@@ -189,10 +197,25 @@ public class LockableResource
 		}
 		return null;
 	}
-	
-	public String getProperties() {
-		return properties;
-	}
+
+    @Exported
+    public List<LockableResourceProperty> getProperties() {
+        return properties;
+    }
+
+    @Exported
+    public Map<String, String> getPropertiesAsMap() {
+        Map<String, String> tmp = new HashMap<>();
+        for (LockableResourceProperty lrp : properties) {
+            tmp.put(lrp.getName(), lrp.getValue());
+        }
+        return tmp;
+    }
+
+    @Exported
+    public String getPropertyValue(String key) {
+        return getPropertiesAsMap().get(key);
+    }
 
 	public boolean isQueued() {
 		return getQueueItemId() != NOT_QUEUED;
@@ -312,6 +335,14 @@ public class LockableResource
 
 	@Extension
 	public static class DescriptorImpl extends Descriptor<LockableResource> {
+
+        @Override
+        public LockableResource newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+            LockableResource resource = super.newInstance(req, formData);
+            if (resource.uniqueID == null)
+                resource.uniqueID = LockableResource.generateUniqueID();
+            return resource;
+        }
 
 		@Override
 		public String getDisplayName() {

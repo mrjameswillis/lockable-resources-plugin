@@ -37,4 +37,9 @@ public class Constants {
      * Prefix for label expression to evaluate potential resources.
      */
     public static final String EXACT_LABEL_MARKER = "label:";
+
+	/**
+	 * The default use percent matching setting (in global).
+	 */
+	public static final boolean DEFAULT_USE_PERCENT_MATCHING = false;
 }

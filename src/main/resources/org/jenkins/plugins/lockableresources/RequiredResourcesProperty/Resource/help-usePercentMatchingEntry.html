@@ -1,0 +1,19 @@
+<div>
+    <p>
+        When used (use with EXACT label matching - label:) the lock will look for the most matched resource.
+        <br/>
+        Defaults to global setting when creating a new required resource.
+    </p>
+    <p>
+        Example setup:
+    </p>
+    <ul>
+        <li>Resource1 labels: <code>sanity 2x1 7.2 pdu</code></li>
+        <li>Resource2 labels: <code>sanity 2x1 7.2</code></li>
+        <br/>
+        <li>Required resource request: <code>label:sanity 2x1 7.2</code></li>
+    </ul>
+    <p>
+        Resource2 will be selected first because the match is 3/3 while Resource1 is 3/4.
+    </p>
+</div>

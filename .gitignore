@@ -1,4 +1,6 @@
+src/test/java/org/jenkins/plugins/lockableresources/ui/sol
 target/
 bin/
+rel/
 work/
 .*

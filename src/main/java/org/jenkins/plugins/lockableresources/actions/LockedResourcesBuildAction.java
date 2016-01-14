@@ -24,9 +24,9 @@ import org.jenkins.plugins.lockableresources.queue.LockableResourcesStruct;
 
 public class LockedResourcesBuildAction implements Action {
 
-	private final List<ResourcePOJO> lockedResources = new ArrayList<ResourcePOJO>();
+	private final List<ResourcePOJO> lockedResources = new ArrayList<>();
 
-	public final transient List<String> matchedResources = new ArrayList<String>();
+	public final transient List<String> matchedResources = new ArrayList<>();
 
 	public final transient Map<String, LockableResourcesStruct> matchedResourcesMap = new HashMap<>();
 

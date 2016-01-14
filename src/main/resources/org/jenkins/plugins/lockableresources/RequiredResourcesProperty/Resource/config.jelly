@@ -11,19 +11,27 @@
  -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
 	xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<f:invisibleEntry>
+        <f:readOnlyTextbox name="uniqueID" value="${instance.uniqueID}"/>
+	</f:invisibleEntry>
 	<f:entry title="${%Resource name or label}" field="resourceNames" >
 		<f:textbox />
 	</f:entry>
     <f:entry title="${%Number of resources to request}" field="resourceNumber">
         <f:textbox />
     </f:entry>
-	<f:entry title="${%Reserved resource variable name}" field="resourceNamesVarEntry">
+	<f:entry title="${%Reserved resource name}" field="resourceNamesVarEntry">
 		<f:textbox name="resourceNamesVar" value="${instance.resourceNamesVar}"/>
 	</f:entry>
-	<f:entry title="${%Reserved resource variables prefix}" field="resourceVarsPrefixEntry">
-		<f:textbox name="resourceVarsPrefix" value="${instance.resourceVarsPrefix}"/>
-	</f:entry>
+    <f:advanced>
+        <f:entry title="${%Reserved resource parameters prefix}" field="resourceVarsPrefixEntry">
+            <f:textbox name="resourceVarsPrefix" value="${instance.resourceVarsPrefix}"/>
+        </f:entry>
+        <f:entry title="${%Use percent matching}" field="usePercentMatchingEntry">
+            <f:checkbox field="usePercentMatching" default="${descriptor.getUsePercentMatchingDefault()}"/>
+        </f:entry>
+    </f:advanced>
     <f:entry>
-        <f:repeatableDeleteButton />
+        <div align="right"><f:repeatableDeleteButton value="Delete Required Resource"/></div>
     </f:entry>
 </j:jelly>
